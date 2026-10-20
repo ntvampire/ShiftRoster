@@ -362,6 +362,51 @@ public static class VerificationTests
 
         Console.WriteLine("[УСПЕХ] (ФИО и должность подменного сохраняются в БД, связка с постоянным работником работает корректно)");
 
+        // 13. Проверка быстрого редактирования ячеек (Б, О, В, 16, 8, Д12, Н12)
+        Console.Write("13. Быстрое редактирование ячеек (Б, О, В, 16, 8, Д12, Н12)... ");
+        var vm = new ShiftRoster.ViewModels.MainViewModel();
+        if (vm.Rows.Count > 0 && vm.Rows[0].DayCells.Count > 0)
+        {
+            var cell1 = vm.Rows[0].DayCells[0];
+            vm.SelectCell(cell1, false, false);
+
+            // Проверка назначения Больничного (Б)
+            vm.ApplyShift("Б");
+            if (cell1.ShiftCode != "Б" || cell1.TotalHours != 0)
+                throw new Exception($"Ожидался статус 'Б' с 0ч, получено: {cell1.ShiftCode}, {cell1.TotalHours}ч");
+
+            // Проверка назначения Отпуска (О)
+            vm.ApplyShift("О");
+            if (cell1.ShiftCode != "О" || cell1.TotalHours != 0)
+                throw new Exception($"Ожидался статус 'О' с 0ч, получено: {cell1.ShiftCode}, {cell1.TotalHours}ч");
+
+            // Проверка назначения Выходного (В)
+            vm.ApplyShift("В");
+            if (cell1.ShiftCode != "В" || cell1.TotalHours != 0)
+                throw new Exception($"Ожидался статус 'В' с 0ч, получено: {cell1.ShiftCode}, {cell1.TotalHours}ч");
+
+            // Проверка смены 16ч
+            vm.ApplyShift("16");
+            if (cell1.ShiftCode != "16" || cell1.TotalHours != 16.0 || cell1.DayHours != 14.0 || cell1.NightHours != 2.0)
+                throw new Exception($"Ожидалась смена '16' (14/2), получено: {cell1.ShiftCode}, {cell1.TotalHours}ч ({cell1.DayHours}/{cell1.NightHours})");
+
+            // Проверка смены 8ч
+            vm.ApplyShift("8");
+            if (cell1.ShiftCode != "8" || cell1.TotalHours != 8.0 || cell1.DayHours != 2.0 || cell1.NightHours != 6.0)
+                throw new Exception($"Ожидалась смена '8' (2/6), получено: {cell1.ShiftCode}, {cell1.TotalHours}ч ({cell1.DayHours}/{cell1.NightHours})");
+
+            // Проверка смены Д12
+            vm.ApplyShift("Д12");
+            if (cell1.ShiftCode != "Д12" || cell1.TotalHours != 12.0)
+                throw new Exception($"Ожидалась смена 'Д12', получено: {cell1.ShiftCode}, {cell1.TotalHours}ч");
+
+            // Проверка смены Н12
+            vm.ApplyShift("Н12");
+            if (cell1.ShiftCode != "Н12" || cell1.TotalHours != 12.0)
+                throw new Exception($"Ожидалась смена 'Н12', получено: {cell1.ShiftCode}, {cell1.TotalHours}ч");
+        }
+        Console.WriteLine("[УСПЕХ] (Быстрое редактирование ячеек статусами Б, О, В и сменами 16/8/12ч работает корректно)");
+
         Console.WriteLine("=================================================");
         Console.WriteLine("ВСЕ ТЕСТЫ И ТРЕБОВАНИЯ ТЗ УСПЕШНО ВЫПОЛНЕНЫ!");
         Console.WriteLine("=================================================");
