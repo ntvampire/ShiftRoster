@@ -314,10 +314,8 @@ public partial class MainWindow : Window
             // Правый клик:
             // Если ячейка еще не в списке выделенных: сбрасываем предыдущие выделения и выделяем только ее.
             // Если ячейка УЖЕ входит в диапазон выделения — сохраняем весь выделенный диапазон!
-            if (!vm.SelectedCells.Contains(cellVm))
-            {
-                vm.SelectCell(cellVm, isCtrlPressed: false, isShiftPressed: false);
-            }
+            ShowCellContextMenu(btn, cellVm, vm);
+            e.Handled = true;
         }
     }
 
@@ -358,51 +356,47 @@ public partial class MainWindow : Window
             vm.SelectCell(cellVm, isCtrlPressed: false, isShiftPressed: false);
         }
 
-        var menu = new ContextMenu();
-        var items = new System.Collections.Generic.List<object>();
+        var flyout = new FluentAvalonia.UI.Controls.FAMenuFlyout();
 
         // 1. Фиксированные статусы отсутствия и отдыха
-        var itemSick = new MenuItem { Header = "🏥 Больничный лист (Б)" };
+        var itemSick = new FluentAvalonia.UI.Controls.MenuFlyoutItem { Text = "🏥 Больничный лист (Б)" };
         itemSick.Click += (_, _) => vm.ApplyShift("Б");
-        items.Add(itemSick);
+        flyout.Items.Add(itemSick);
 
-        var itemVacation = new MenuItem { Header = "🏖️ Отпуск (О)" };
+        var itemVacation = new FluentAvalonia.UI.Controls.MenuFlyoutItem { Text = "🏖️ Отпуск (О)" };
         itemVacation.Click += (_, _) => vm.ApplyShift("О");
-        items.Add(itemVacation);
+        flyout.Items.Add(itemVacation);
 
-        var itemOff = new MenuItem { Header = "⚪ Выходной день (В)" };
+        var itemOff = new FluentAvalonia.UI.Controls.MenuFlyoutItem { Text = "⚪ Выходной день (В)" };
         itemOff.Click += (_, _) => vm.ApplyShift("В");
-        items.Add(itemOff);
+        flyout.Items.Add(itemOff);
 
-        items.Add(new Separator());
+        flyout.Items.Add(new FluentAvalonia.UI.Controls.MenuFlyoutSeparator());
 
         // 2. Рабочие смены согласно выбранному режиму подразделения
         if (vm.CurrentPostPattern == "2/2")
         {
-            var itemDay12 = new MenuItem { Header = "☀️ 12ч День (Д12)" };
+            var itemDay12 = new FluentAvalonia.UI.Controls.MenuFlyoutItem { Text = "☀️ 12ч День (Д12)" };
             itemDay12.Click += (_, _) => vm.ApplyShift("Д12");
-            items.Add(itemDay12);
+            flyout.Items.Add(itemDay12);
 
-            var itemNight12 = new MenuItem { Header = "🌙 12ч Ночь (Н12)" };
+            var itemNight12 = new FluentAvalonia.UI.Controls.MenuFlyoutItem { Text = "🌙 12ч Ночь (Н12)" };
             itemNight12.Click += (_, _) => vm.ApplyShift("Н12");
-            items.Add(itemNight12);
+            flyout.Items.Add(itemNight12);
         }
         else
         {
-            var item16 = new MenuItem { Header = "⏱️ 16ч (Заступление)" };
+            var item16 = new FluentAvalonia.UI.Controls.MenuFlyoutItem { Text = "⏱️ 16ч (Заступление)" };
             item16.Click += (_, _) => vm.ApplyShift("16");
-            items.Add(item16);
+            flyout.Items.Add(item16);
 
-            var item8 = new MenuItem { Header = "⏱️ 8ч (Сдача)" };
+            var item8 = new FluentAvalonia.UI.Controls.MenuFlyoutItem { Text = "⏱️ 8ч (Сдача)" };
             item8.Click += (_, _) => vm.ApplyShift("8");
-            items.Add(item8);
+            flyout.Items.Add(item8);
         }
 
-        menu.ItemsSource = items;
-        // Открываем контекстное меню прямо над кнопкой целевой ячейки.
-        // btn.ContextMenu намеренно НЕ устанавливаем (оставляем null),
-        // чтобы нативные обработчики классов Avalonia не перехватывали последующие клики!
-        menu.Open(btn);
+        // Открываем FAMenuFlyout над целевой кнопкой ячейки
+        flyout.ShowAt(btn);
     }
 
     private async void OnAddNewPostClicked(object? sender, RoutedEventArgs e)

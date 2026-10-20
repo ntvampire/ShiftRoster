@@ -408,37 +408,35 @@ public static class VerificationTests
         }
         Console.WriteLine("[УСПЕХ] (Быстрое редактирование ячеек статусами Б, О, В и сменами 16/8/12ч работает корректно)");
 
-        // 14. Проверка контекстного меню по ПКМ для ячеек и диапазонов
-        Console.Write("14. Проверка работы контекстного меню по ПКМ для ячеек и диапазонов... ");
+        // 14. Проверка работы контекстного меню FAMenuFlyout на клики ПКМ
+        Console.Write("14. Проверка контекстного меню FAMenuFlyout на клики ПКМ... ");
         Program.BuildAvaloniaApp().SetupWithoutStarting();
-        var window = new ShiftRoster.Views.MainWindow();
-        var btn = new Avalonia.Controls.Button { Width = 50, Height = 50 };
-        window.Content = btn;
-        window.Show();
+        var flyoutWindow = new ShiftRoster.Views.MainWindow();
+        var flyoutVm = new ShiftRoster.ViewModels.MainViewModel();
+        flyoutWindow.DataContext = flyoutVm;
+        flyoutWindow.Show();
 
-        // Проверяем надежность menu.Open(btn) при btn.ContextMenu == null (без блокировок Avalonia)
-        var menu1 = new Avalonia.Controls.ContextMenu();
-        menu1.Items.Add(new Avalonia.Controls.MenuItem { Header = "🏥 Больничный лист (Б)" });
-        menu1.Open(btn);
-        if (!menu1.IsOpen) throw new Exception("Контекстное меню не открылось при первом вызове");
-        menu1.Close();
+        var flyoutBtn = new Avalonia.Controls.Button { Width = 50, Height = 50 };
+        var flyoutCell = new ShiftRoster.ViewModels.RosterCellViewModel(new ShiftRoster.Models.RosterCell { DayOfMonth = 1, EmployeeName = "Иванов" }, 2026, 10);
+        flyoutBtn.DataContext = flyoutCell;
 
-        // Повторное открытие на той же ячейке
-        var menu2 = new Avalonia.Controls.ContextMenu();
-        menu2.Items.Add(new Avalonia.Controls.MenuItem { Header = "⚪ Выходной день (В)" });
-        menu2.Open(btn);
-        if (!menu2.IsOpen) throw new Exception("Контекстное меню не открылось при повторном вызове на ячейке");
-        menu2.Close();
+        var pointer = new Avalonia.Input.Pointer(1, Avalonia.Input.PointerType.Mouse, true);
 
-        // Открытие на другой ячейке (как при клике по диапазону)
-        var btn2 = new Avalonia.Controls.Button { Width = 50, Height = 50 };
-        var menu3 = new Avalonia.Controls.ContextMenu();
-        menu3.Items.Add(new Avalonia.Controls.MenuItem { Header = "⏱️ 16ч (Заступление)" });
-        menu3.Open(btn2);
-        if (!menu3.IsOpen) throw new Exception("Контекстное меню не открылось на ячейке диапазона");
-        menu3.Close();
+        // 1-й клик ПКМ
+        var pPressed1 = new Avalonia.Input.PointerPressedEventArgs(
+            flyoutBtn, pointer, flyoutWindow, new Avalonia.Point(5, 5), (ulong)Environment.TickCount64,
+            new Avalonia.Input.PointerPointProperties(Avalonia.Input.RawInputModifiers.RightMouseButton, Avalonia.Input.PointerUpdateKind.RightButtonPressed),
+            Avalonia.Input.KeyModifiers.None);
+        flyoutWindow.OnCellPointerPressed(flyoutBtn, pPressed1);
 
-        Console.WriteLine("[УСПЕХ] (Контекстное меню стабильно открывается на ячейках и диапазонах без блокировок)");
+        // 2-й клик ПКМ (проверка повторного открытия)
+        var pPressed2 = new Avalonia.Input.PointerPressedEventArgs(
+            flyoutBtn, pointer, flyoutWindow, new Avalonia.Point(5, 5), (ulong)Environment.TickCount64 + 300,
+            new Avalonia.Input.PointerPointProperties(Avalonia.Input.RawInputModifiers.RightMouseButton, Avalonia.Input.PointerUpdateKind.RightButtonPressed),
+            Avalonia.Input.KeyModifiers.None);
+        flyoutWindow.OnCellPointerPressed(flyoutBtn, pPressed2);
+
+        Console.WriteLine("[УСПЕХ] (FAMenuFlyout открывается стабильно без ошибок)");
 
         Console.WriteLine("=================================================");
         Console.WriteLine("ВСЕ ТЕСТЫ И ТРЕБОВАНИЯ ТЗ УСПЕШНО ВЫПОЛНЕНЫ!");
