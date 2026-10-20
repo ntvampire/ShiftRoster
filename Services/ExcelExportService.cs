@@ -108,7 +108,18 @@ public class ExcelExportService
         tableRange.Style.Border.InsideBorder = XLBorderStyleValues.Thin;
         tableRange.Style.Border.OutsideBorder = XLBorderStyleValues.Medium;
 
-        ws.Columns().AdjustToContents(15, 45);
+        // Явное задание комфортной ширины столбцов, чтобы ФИО и должности не обрезались
+        ws.Column(1).Width = 7;   // № п/п
+        ws.Column(2).Width = 34;  // ФИО сотрудника (свободно вмещает полное ФИО)
+        ws.Column(3).Width = 28;  // Должность
+        ws.Column(4).Width = 16;  // Статус
+        ws.Column(5).Width = 14;  // Отработано дней
+        ws.Column(6).Width = 14;  // Всего часов
+        ws.Column(7).Width = 14;  // В т.ч. дневных
+        ws.Column(8).Width = 14;  // В т.ч. ночных
+        ws.Column(9).Width = 18;  // Праздничных (двойная опл.)
+        ws.Column(10).Width = 14; // Дней отпуска
+        ws.Column(11).Width = 15; // Дней больничного
     }
 
     /// <summary>
@@ -224,7 +235,18 @@ public class ExcelExportService
             ws.Cell(grandTotalRow, c).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
         }
 
-        ws.Columns().AdjustToContents(15, 45);
+        // Явное задание комфортной ширины столбцов
+        ws.Column(1).Width = 7;   // № п/п
+        ws.Column(2).Width = 34;  // ФИО сотрудника
+        ws.Column(3).Width = 28;  // Должность
+        ws.Column(4).Width = 16;  // Статус
+        ws.Column(5).Width = 14;  // Отработано дней
+        ws.Column(6).Width = 14;  // Всего часов
+        ws.Column(7).Width = 14;  // В т.ч. дневных
+        ws.Column(8).Width = 14;  // В т.ч. ночных
+        ws.Column(9).Width = 18;  // Праздничных (двойная опл.)
+        ws.Column(10).Width = 14; // Дней отпуска
+        ws.Column(11).Width = 15; // Дней больничного
     }
 
     private static void WriteSummaryTableHeader(IXLWorksheet ws, int row)

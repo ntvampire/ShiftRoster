@@ -14,6 +14,7 @@ public partial class ManageEmployeesDialog : Window
     private Employee? _selectedEmployee;
 
     public string CurrentSelectedPost { get; private set; } = string.Empty;
+    public bool ShouldRecalculateSchedule => RecalculateScheduleCheckBox.IsChecked == true;
 
     public ManageEmployeesDialog()
     {
@@ -21,10 +22,11 @@ public partial class ManageEmployeesDialog : Window
 
         PostFilterComboBox.SelectionChanged += OnPostFilterChanged;
         EmployeesListBox.SelectionChanged += OnEmployeeSelected;
+        MoveUpButton.Click += OnMoveUpClicked;
+        MoveDownButton.Click += OnMoveDownClicked;
         SaveButton.Click += OnSaveClicked;
         AddClearButton.Click += OnAddClearClicked;
         DeleteButton.Click += OnDeleteClicked;
-        AddNewPostButton.Click += OnAddNewPostClicked;
         CloseButton.Click += (_, _) => Close(true);
     }
 
@@ -49,12 +51,41 @@ public partial class ManageEmployeesDialog : Window
             PostFilterComboBox.SelectedIndex = 0;
             CurrentSelectedPost = posts[0];
         }
+        else
+        {
+            CurrentSelectedPost = string.Empty;
+        }
+
+        UpdatePatternBadge();
+    }
+
+    private void UpdatePatternBadge()
+    {
+        if (string.IsNullOrWhiteSpace(CurrentSelectedPost))
+        {
+            PostPatternBadgeText.Text = "Подразделение не выбрано";
+            return;
+        }
+
+        string pat = DatabaseService.Instance.GetPostPattern(CurrentSelectedPost);
+        PostPatternBadgeText.Text = pat == "1/3" 
+            ? "Схема: Сутки через трое (1/3)" 
+            : "Схема: 2 через 2 (по 12ч)";
     }
 
     private void RefreshEmployees()
     {
         _allEmployees.Clear();
-        _allEmployees.AddRange(DatabaseService.Instance.GetEmployees(CurrentSelectedPost));
+        if (!string.IsNullOrWhiteSpace(CurrentSelectedPost))
+        {
+            _allEmployees.AddRange(DatabaseService.Instance.GetEmployees(CurrentSelectedPost));
+        }
+
+        // Гарантируем правильную нумерацию SortOrder
+        for (int i = 0; i < _allEmployees.Count; i++)
+        {
+            _allEmployees[i].SortOrder = i + 1;
+        }
 
         EmployeesListBox.ItemsSource = null;
         EmployeesListBox.ItemsSource = _allEmployees;
@@ -74,7 +105,7 @@ public partial class ManageEmployeesDialog : Window
         if (PostFilterComboBox.SelectedItem is string post && !string.IsNullOrWhiteSpace(post))
         {
             CurrentSelectedPost = post;
-            PostNameTextBox.Text = post;
+            UpdatePatternBadge();
             RefreshEmployees();
         }
     }
@@ -87,18 +118,11 @@ public partial class ManageEmployeesDialog : Window
             EditorTitleText.Text = $"Редактирование: {emp.FullName}";
             FullNameTextBox.Text = emp.FullName;
             PositionTextBox.Text = emp.Position;
-            PostNameTextBox.Text = emp.PostName;
             InitialDayNumeric.Value = emp.InitialShiftDay;
-
-            // Выбор схемы
-            for (int i = 0; i < PatternComboBox.Items.Count; i++)
-            {
-                if (PatternComboBox.Items[i] is ComboBoxItem item && item.Tag?.ToString() == emp.ShiftPattern)
-                {
-                    PatternComboBox.SelectedIndex = i;
-                    break;
-                }
-            }
+        }
+        else
+        {
+            ClearEditor();
         }
     }
 
@@ -108,12 +132,40 @@ public partial class ManageEmployeesDialog : Window
         EditorTitleText.Text = "Новый сотрудник";
         FullNameTextBox.Text = string.Empty;
         PositionTextBox.Text = "Дежурный оператор";
-        PostNameTextBox.Text = CurrentSelectedPost;
 
         // Предлагаем следующий свободный день смены (1..4)
         int nextDay = (_allEmployees.Count % 4) + 1;
         InitialDayNumeric.Value = nextDay;
-        PatternComboBox.SelectedIndex = 0;
+    }
+
+    private void OnMoveUpClicked(object? sender, RoutedEventArgs e)
+    {
+        int index = EmployeesListBox.SelectedIndex;
+        if (index > 0 && index < _allEmployees.Count)
+        {
+            var item = _allEmployees[index];
+            _allEmployees.RemoveAt(index);
+            _allEmployees.Insert(index - 1, item);
+
+            DatabaseService.Instance.UpdateEmployeesOrder(_allEmployees);
+            RefreshEmployees();
+            EmployeesListBox.SelectedIndex = index - 1;
+        }
+    }
+
+    private void OnMoveDownClicked(object? sender, RoutedEventArgs e)
+    {
+        int index = EmployeesListBox.SelectedIndex;
+        if (index >= 0 && index < _allEmployees.Count - 1)
+        {
+            var item = _allEmployees[index];
+            _allEmployees.RemoveAt(index);
+            _allEmployees.Insert(index + 1, item);
+
+            DatabaseService.Instance.UpdateEmployeesOrder(_allEmployees);
+            RefreshEmployees();
+            EmployeesListBox.SelectedIndex = index + 1;
+        }
     }
 
     private void OnAddClearClicked(object? sender, RoutedEventArgs e)
@@ -132,15 +184,11 @@ public partial class ManageEmployeesDialog : Window
         }
 
         string pos = PositionTextBox.Text?.Trim() ?? "Оператор";
-        string post = PostNameTextBox.Text?.Trim() ?? CurrentSelectedPost;
+        string post = CurrentSelectedPost;
         if (string.IsNullOrWhiteSpace(post)) post = "Смена №1";
 
         int startDay = (int)(InitialDayNumeric.Value ?? 1);
-        string pattern = "1/3";
-        if (PatternComboBox.SelectedItem is ComboBoxItem item && item.Tag is string tag)
-        {
-            pattern = tag;
-        }
+        string pattern = DatabaseService.Instance.GetPostPattern(post);
 
         var emp = _selectedEmployee ?? new Employee();
         emp.FullName = name;
@@ -148,16 +196,17 @@ public partial class ManageEmployeesDialog : Window
         emp.PostName = post;
         emp.InitialShiftDay = startDay;
         emp.ShiftPattern = pattern;
+        if (emp.Id == 0)
+        {
+            emp.SortOrder = _allEmployees.Count + 1;
+        }
         emp.IsActive = true;
         emp.IsPermanent = true;
 
         DatabaseService.Instance.SaveEmployee(emp);
 
-        CurrentSelectedPost = post;
-        RefreshPosts();
         RefreshEmployees();
 
-        // Выделяем сохраненного сотрудника
         var match = _allEmployees.FirstOrDefault(x => x.FullName == name);
         if (match != null)
         {
@@ -169,34 +218,10 @@ public partial class ManageEmployeesDialog : Window
     {
         if (_selectedEmployee != null && _selectedEmployee.Id > 0)
         {
-            DatabaseService.Instance.DeleteEmployee(_selectedEmployee.Id);
+            int delId = _selectedEmployee.Id;
+            DatabaseService.Instance.DeleteEmployee(delId);
+            _selectedEmployee = null;
             RefreshEmployees();
         }
-    }
-
-    private void OnAddNewPostClicked(object? sender, RoutedEventArgs e)
-    {
-        int count = DatabaseService.Instance.GetAllPostNames().Count + 1;
-        string newPostName = $"Смена №{count}";
-
-        CurrentSelectedPost = newPostName;
-        PostNameTextBox.Text = newPostName;
-        ClearEditor();
-
-        // Сохраним временного сотрудника для новой смены
-        var dummyEmp = new Employee
-        {
-            FullName = $"Оператор {count}.1",
-            Position = "Дежурный оператор",
-            PostName = newPostName,
-            InitialShiftDay = 1,
-            ShiftPattern = "1/3",
-            IsActive = true,
-            IsPermanent = true
-        };
-        DatabaseService.Instance.SaveEmployee(dummyEmp);
-
-        RefreshPosts();
-        PostFilterComboBox.SelectedItem = newPostName;
     }
 }

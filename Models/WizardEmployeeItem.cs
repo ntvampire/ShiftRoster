@@ -14,14 +14,14 @@ public partial class WizardEmployeeItem : ObservableObject
     private string _position = "Дежурный оператор";
 
     [ObservableProperty]
-    private int _initialShiftDay = 1;
+    private decimal _initialShiftDay = 1m;
 
     [ObservableProperty]
     private string _shiftPattern = "1/3";
 
     public WizardEmployeeItem() { }
 
-    public WizardEmployeeItem(string fullName, string position, int initialShiftDay, string shiftPattern = "1/3")
+    public WizardEmployeeItem(string fullName, string position, decimal initialShiftDay, string shiftPattern = "1/3")
     {
         FullName = fullName;
         Position = position;

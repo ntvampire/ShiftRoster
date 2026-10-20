@@ -2,61 +2,69 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="ShiftRoster.Views.AssignSubstituteDialog"
         Title="Назначение подменного работника"
-        Width="500" Height="420"
-        CanResize="False"
+        Width="540" Height="560" MinHeight="480"
+        SizeToContent="Height"
+        CanResize="True"
         WindowStartupLocation="CenterOwner"
         Background="#202020">
 
-    <Border Padding="20">
-        <StackPanel Spacing="16">
-            <TextBlock Text="Назначить подменного работника" 
-                       FontSize="18" FontWeight="SemiBold" Foreground="White" />
+    <Grid RowDefinitions="*,Auto" Margin="20">
+        
+        <!-- ОСНОВНАЯ ФОРМА С ПРОКРУТКОЙ -->
+        <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel Spacing="16" Margin="0,0,8,0">
+                <TextBlock Text="Назначить подменного работника" 
+                           FontSize="18" FontWeight="SemiBold" Foreground="White" />
 
-            <TextBlock Text="Замещение постоянного сотрудника на время болезни или отпуска. Подменный работник автоматически выставится в график на соответствующие смены."
-                       TextWrapping="Wrap" Foreground="#A0A0A0" FontSize="12" />
+                <TextBlock Text="Замещение постоянного сотрудника на время болезни или отпуска. Подменный работник автоматически выставится в график на соответствующие смены."
+                           TextWrapping="Wrap" Foreground="#A0A0A0" FontSize="12" />
 
-            <!-- Выбор основного сотрудника -->
-            <StackPanel Spacing="4">
-                <TextBlock Text="Основной сотрудник:" Foreground="#CCCCCC" FontSize="13" />
-                <ComboBox x:Name="MainEmployeeComboBox" HorizontalAlignment="Stretch" />
-            </StackPanel>
-
-            <!-- Причина отсутствия -->
-            <StackPanel Spacing="4">
-                <TextBlock Text="Причина отсутствия:" Foreground="#CCCCCC" FontSize="13" />
-                <ComboBox x:Name="ReasonComboBox" HorizontalAlignment="Stretch" SelectedIndex="0">
-                    <ComboBoxItem Content="Отпуск (О)" Tag="О" />
-                    <ComboBoxItem Content="Больничный (Б)" Tag="Б" />
-                </ComboBox>
-            </StackPanel>
-
-            <!-- Период отсутствия -->
-            <Grid ColumnDefinitions="*,16,*">
-                <StackPanel Grid.Column="0" Spacing="4">
-                    <TextBlock Text="С какого числа:" Foreground="#CCCCCC" FontSize="13" />
-                    <NumericUpDown x:Name="StartDayNumeric" Minimum="1" Maximum="31" Value="1" FormatString="0" />
+                <!-- Выбор основного сотрудника -->
+                <StackPanel Spacing="4">
+                    <TextBlock Text="Основной сотрудник:" Foreground="#CCCCCC" FontSize="13" />
+                    <ComboBox x:Name="MainEmployeeComboBox" HorizontalAlignment="Stretch" />
                 </StackPanel>
-                <StackPanel Grid.Column="2" Spacing="4">
-                    <TextBlock Text="По какое число:" Foreground="#CCCCCC" FontSize="13" />
-                    <NumericUpDown x:Name="EndDayNumeric" Minimum="1" Maximum="31" Value="14" FormatString="0" />
+
+                <!-- Причина отсутствия -->
+                <StackPanel Spacing="4">
+                    <TextBlock Text="Причина отсутствия:" Foreground="#CCCCCC" FontSize="13" />
+                    <ComboBox x:Name="ReasonComboBox" HorizontalAlignment="Stretch" SelectedIndex="0">
+                        <ComboBoxItem Content="Отпуск (О)" Tag="О" />
+                        <ComboBoxItem Content="Больничный (Б)" Tag="Б" />
+                    </ComboBox>
                 </StackPanel>
-            </Grid>
 
-            <!-- ФИО подменного сотрудника (произвольный ввод!) -->
-            <StackPanel Spacing="4">
-                <TextBlock Text="ФИО подменного работника (впишите произвольно):" Foreground="#CCCCCC" FontSize="13" />
-                <AutoCompleteBox x:Name="SubstituteNameBox" 
-                                 Watermark="Например: Смирнов В.А." 
-                                 FilterMode="ContainsOrdinal" />
-                <TextBlock Text="* Подменные сотрудники редко повторяются, поэтому заводить отдельную карточку не нужно."
-                           Foreground="#777777" FontSize="11" />
-            </StackPanel>
+                <!-- Период отсутствия -->
+                <Grid ColumnDefinitions="*,16,*">
+                    <StackPanel Grid.Column="0" Spacing="4">
+                        <TextBlock Text="С какого числа:" Foreground="#CCCCCC" FontSize="13" />
+                        <NumericUpDown x:Name="StartDayNumeric" Minimum="1" Maximum="31" Value="1" FormatString="0" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="2" Spacing="4">
+                        <TextBlock Text="По какое число:" Foreground="#CCCCCC" FontSize="13" />
+                        <NumericUpDown x:Name="EndDayNumeric" Minimum="1" Maximum="31" Value="14" FormatString="0" />
+                    </StackPanel>
+                </Grid>
 
-            <!-- Кнопки действий -->
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="12" Margin="0,10,0,0">
-                <Button x:Name="CancelButton" Content="Отмена" Width="100" />
-                <Button x:Name="ApplyButton" Content="Назначить" Width="120" Classes="accent" />
+                <!-- ФИО подменного сотрудника (произвольный ввод!) -->
+                <StackPanel Spacing="4">
+                    <TextBlock Text="ФИО подменного работника (впишите произвольно):" Foreground="#CCCCCC" FontSize="13" />
+                    <AutoCompleteBox x:Name="SubstituteNameBox" 
+                                     Watermark="Например: Смирнов В.А." 
+                                     FilterMode="ContainsOrdinal" />
+                    <TextBlock Text="* Подменные сотрудники редко повторяются, поэтому заводить отдельную карточку не нужно."
+                               Foreground="#777777" FontSize="11" />
+                </StackPanel>
             </StackPanel>
-        </StackPanel>
-    </Border>
+        </ScrollViewer>
+
+        <!-- КНОПКИ ДЕЙСТВИЙ (ФИКСИРОВАНЫ ВНИЗУ, НИКОГДА НЕ СРЕЗАЮТСЯ) -->
+        <Border Grid.Row="1" Margin="0,16,0,0" Padding="0,14,0,0" BorderBrush="#333333" BorderThickness="0,1,0,0">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="12">
+                <Button x:Name="CancelButton" Content="Отмена" Width="110" Height="36" />
+                <Button x:Name="ApplyButton" Content="Назначить" Width="140" Height="36" Classes="accent" />
+            </StackPanel>
+        </Border>
+
+    </Grid>
 </Window>

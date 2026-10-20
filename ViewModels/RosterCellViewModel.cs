@@ -21,6 +21,12 @@ public partial class RosterCellViewModel : ObservableObject
     [ObservableProperty]
     private bool _isSelected;
 
+    partial void OnIsSelectedChanged(bool value)
+    {
+        OnPropertyChanged(nameof(CellBorderBrush));
+        OnPropertyChanged(nameof(CellBackground));
+    }
+
     public RosterCellViewModel(RosterCell model, int year, int month)
     {
         Model = model;
@@ -83,6 +89,7 @@ public partial class RosterCellViewModel : ObservableObject
     {
         get
         {
+            if (IsSelected) return "#004B87"; // Подсветка выделенных ячеек (WinUI Accent dark blue)
             if (Model.ShiftCode == "О") return "#1B4D2E"; // Отпуск — приглушенный зеленый
             if (Model.ShiftCode == "Б") return "#5A3D1A"; // Больничный — приглушенный оранжево-коричневый
             if (Model.TotalHours == 16) return "#1F3B5C"; // Заступление 16ч — глубокий темно-синий
@@ -102,7 +109,7 @@ public partial class RosterCellViewModel : ObservableObject
     {
         get
         {
-            if (IsSelected) return "#0078D4"; // Выделенная ячейка — синий WinUI акцент
+            if (IsSelected) return "#2899F5"; // Выделенная ячейка — яркий синий WinUI акцент
             if (IsHoliday) return "#A80000";  // Праздник — красная рамка
             if (Model.IsSubstitute && Model.TotalHours > 0) return "#D89B00"; // Подмена — золотистая рамка
             return "#383838";

@@ -111,7 +111,8 @@ public class DatabaseService
                 IsActive INTEGER NOT NULL DEFAULT 1,
                 Notes TEXT,
                 InitialShiftDay INTEGER NOT NULL DEFAULT 1,
-                ShiftPattern TEXT NOT NULL DEFAULT '1/3'
+                ShiftPattern TEXT NOT NULL DEFAULT '1/3',
+                SortOrder INTEGER NOT NULL DEFAULT 0
             );
 
             CREATE TABLE IF NOT EXISTS ShiftSchedules (
@@ -180,6 +181,14 @@ public class DatabaseService
             alterCmd2.ExecuteNonQuery();
         }
         catch { }
+
+        try
+        {
+            using var alterCmd3 = connection.CreateCommand();
+            alterCmd3.CommandText = "ALTER TABLE Employees ADD COLUMN SortOrder INTEGER NOT NULL DEFAULT 0";
+            alterCmd3.ExecuteNonQuery();
+        }
+        catch { }
     }
 
     // --- Методы для работы с сотрудниками ---
@@ -192,11 +201,11 @@ public class DatabaseService
         using var cmd = conn.CreateCommand();
         if (string.IsNullOrWhiteSpace(postName))
         {
-            cmd.CommandText = "SELECT Id, FullName, Position, PostName, IsPermanent, IsActive, Notes, InitialShiftDay, ShiftPattern FROM Employees WHERE IsActive = 1 ORDER BY FullName";
+            cmd.CommandText = "SELECT Id, FullName, Position, PostName, IsPermanent, IsActive, Notes, InitialShiftDay, ShiftPattern, SortOrder FROM Employees WHERE IsActive = 1 ORDER BY CASE WHEN SortOrder <= 0 THEN 999999 ELSE SortOrder END ASC, InitialShiftDay ASC, FullName ASC";
         }
         else
         {
-            cmd.CommandText = "SELECT Id, FullName, Position, PostName, IsPermanent, IsActive, Notes, InitialShiftDay, ShiftPattern FROM Employees WHERE IsActive = 1 AND PostName = @post ORDER BY InitialShiftDay, FullName";
+            cmd.CommandText = "SELECT Id, FullName, Position, PostName, IsPermanent, IsActive, Notes, InitialShiftDay, ShiftPattern, SortOrder FROM Employees WHERE IsActive = 1 AND PostName = @post ORDER BY CASE WHEN SortOrder <= 0 THEN 999999 ELSE SortOrder END ASC, InitialShiftDay ASC, FullName ASC";
             cmd.Parameters.AddWithValue("@post", postName);
         }
 
@@ -213,7 +222,8 @@ public class DatabaseService
                 IsActive = reader.GetInt32(5) == 1,
                 Notes = reader.IsDBNull(6) ? null : reader.GetString(6),
                 InitialShiftDay = reader.IsDBNull(7) ? 1 : reader.GetInt32(7),
-                ShiftPattern = reader.IsDBNull(8) ? "1/3" : reader.GetString(8)
+                ShiftPattern = reader.IsDBNull(8) ? "1/3" : reader.GetString(8),
+                SortOrder = reader.IsDBNull(9) ? 0 : reader.GetInt32(9)
             });
         }
         return result;
@@ -228,8 +238,8 @@ public class DatabaseService
         if (emp.Id == 0)
         {
             cmd.CommandText = @"
-                INSERT INTO Employees (FullName, Position, PostName, IsPermanent, IsActive, Notes, InitialShiftDay, ShiftPattern)
-                VALUES (@name, @pos, @post, @perm, @act, @notes, @startDay, @pattern);
+                INSERT INTO Employees (FullName, Position, PostName, IsPermanent, IsActive, Notes, InitialShiftDay, ShiftPattern, SortOrder)
+                VALUES (@name, @pos, @post, @perm, @act, @notes, @startDay, @pattern, @sortOrder);
                 SELECT last_insert_rowid();";
         }
         else
@@ -237,7 +247,7 @@ public class DatabaseService
             cmd.CommandText = @"
                 UPDATE Employees SET FullName = @name, Position = @pos, PostName = @post, 
                 IsPermanent = @perm, IsActive = @act, Notes = @notes,
-                InitialShiftDay = @startDay, ShiftPattern = @pattern WHERE Id = @id";
+                InitialShiftDay = @startDay, ShiftPattern = @pattern, SortOrder = @sortOrder WHERE Id = @id";
             cmd.Parameters.AddWithValue("@id", emp.Id);
         }
 
@@ -249,6 +259,7 @@ public class DatabaseService
         cmd.Parameters.AddWithValue("@notes", (object?)emp.Notes ?? DBNull.Value);
         cmd.Parameters.AddWithValue("@startDay", emp.InitialShiftDay);
         cmd.Parameters.AddWithValue("@pattern", emp.ShiftPattern);
+        cmd.Parameters.AddWithValue("@sortOrder", emp.SortOrder);
 
         if (emp.Id == 0)
         {
@@ -258,6 +269,26 @@ public class DatabaseService
         {
             cmd.ExecuteNonQuery();
         }
+    }
+
+    public void UpdateEmployeesOrder(List<Employee> employees)
+    {
+        using var conn = new SqliteConnection(_connectionString);
+        conn.Open();
+        using var tx = conn.BeginTransaction();
+
+        for (int i = 0; i < employees.Count; i++)
+        {
+            employees[i].SortOrder = i + 1;
+            using var cmd = conn.CreateCommand();
+            cmd.Transaction = tx;
+            cmd.CommandText = "UPDATE Employees SET SortOrder = @so WHERE Id = @id";
+            cmd.Parameters.AddWithValue("@so", employees[i].SortOrder);
+            cmd.Parameters.AddWithValue("@id", employees[i].Id);
+            cmd.ExecuteNonQuery();
+        }
+
+        tx.Commit();
     }
 
     public List<string> GetAllPostNames()
@@ -359,10 +390,105 @@ public class DatabaseService
     {
         using var conn = new SqliteConnection(_connectionString);
         conn.Open();
+        using var tx = conn.BeginTransaction();
+
+        string empName = string.Empty;
+        using (var nameCmd = conn.CreateCommand())
+        {
+            nameCmd.Transaction = tx;
+            nameCmd.CommandText = "SELECT FullName FROM Employees WHERE Id = @id";
+            nameCmd.Parameters.AddWithValue("@id", id);
+            empName = nameCmd.ExecuteScalar() as string ?? string.Empty;
+        }
+
         using var cmd = conn.CreateCommand();
+        cmd.Transaction = tx;
         cmd.CommandText = "UPDATE Employees SET IsActive = 0 WHERE Id = @id";
         cmd.Parameters.AddWithValue("@id", id);
         cmd.ExecuteNonQuery();
+
+        if (!string.IsNullOrWhiteSpace(empName))
+        {
+            using var cmdCells = conn.CreateCommand();
+            cmdCells.Transaction = tx;
+            cmdCells.CommandText = "DELETE FROM RosterCells WHERE EmployeeName = @name";
+            cmdCells.Parameters.AddWithValue("@name", empName);
+            cmdCells.ExecuteNonQuery();
+        }
+
+        tx.Commit();
+    }
+
+    /// <summary>
+    /// Полное удаление смены/поста, ее сотрудников, графиков и ячеек табеля
+    /// </summary>
+    public void DeletePost(string postName)
+    {
+        if (string.IsNullOrWhiteSpace(postName)) return;
+
+        using var conn = new SqliteConnection(_connectionString);
+        conn.Open();
+        using var tx = conn.BeginTransaction();
+
+        using var cmd1 = conn.CreateCommand();
+        cmd1.Transaction = tx;
+        cmd1.CommandText = @"
+            DELETE FROM RosterCells 
+            WHERE ScheduleId IN (SELECT Id FROM ShiftSchedules WHERE PostName = @p)";
+        cmd1.Parameters.AddWithValue("@p", postName);
+        cmd1.ExecuteNonQuery();
+
+        using var cmd2 = conn.CreateCommand();
+        cmd2.Transaction = tx;
+        cmd2.CommandText = "DELETE FROM ShiftSchedules WHERE PostName = @p";
+        cmd2.Parameters.AddWithValue("@p", postName);
+        cmd2.ExecuteNonQuery();
+
+        using var cmd3 = conn.CreateCommand();
+        cmd3.Transaction = tx;
+        cmd3.CommandText = "DELETE FROM Employees WHERE PostName = @p";
+        cmd3.Parameters.AddWithValue("@p", postName);
+        cmd3.ExecuteNonQuery();
+
+        tx.Commit();
+    }
+
+    public string GetPostPattern(string postName)
+    {
+        if (string.IsNullOrWhiteSpace(postName)) return "1/3";
+
+        using var conn = new SqliteConnection(_connectionString);
+        conn.Open();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = "SELECT PatternType FROM ShiftSchedules WHERE PostName = @p ORDER BY Id DESC LIMIT 1";
+        cmd.Parameters.AddWithValue("@p", postName);
+        var val = cmd.ExecuteScalar() as string;
+        if (!string.IsNullOrWhiteSpace(val)) return val;
+
+        using var cmd2 = conn.CreateCommand();
+        cmd2.CommandText = "SELECT ShiftPattern FROM Employees WHERE PostName = @p AND IsActive = 1 LIMIT 1";
+        cmd2.Parameters.AddWithValue("@p", postName);
+        var val2 = cmd2.ExecuteScalar() as string;
+        return !string.IsNullOrWhiteSpace(val2) ? val2 : "1/3";
+    }
+
+    public void SetPostPattern(string postName, string pattern)
+    {
+        if (string.IsNullOrWhiteSpace(postName)) return;
+
+        using var conn = new SqliteConnection(_connectionString);
+        conn.Open();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = "UPDATE ShiftSchedules SET PatternType = @pat WHERE PostName = @p";
+        cmd.Parameters.AddWithValue("@pat", pattern);
+        cmd.Parameters.AddWithValue("@p", postName);
+        cmd.ExecuteNonQuery();
+
+        using var cmd2 = conn.CreateCommand();
+        cmd2.CommandText = "UPDATE Employees SET ShiftPattern = @pat WHERE PostName = @p";
+        cmd2.Parameters.AddWithValue("@pat", pattern);
+        cmd2.Parameters.AddWithValue("@p", postName);
+        cmd2.ExecuteNonQuery();
     }
 
     // --- Методы для работы с графиками и ячейками табеля ---

@@ -25,10 +25,13 @@ public partial class MainViewModel : ViewModelBase
     private string _currentMonthName = string.Empty;
 
     [ObservableProperty]
-    private string _currentPostName = "Смена №1 (Пост 1)";
+    private string _currentPostName = string.Empty;
 
     [ObservableProperty]
-    private string _selectedPost = "Смена №1 (Пост 1)";
+    private string _selectedPost = string.Empty;
+
+    [ObservableProperty]
+    private string _currentPostPattern = "1/3";
 
     [ObservableProperty]
     private string _organizationName = string.Empty;
@@ -46,8 +49,12 @@ public partial class MainViewModel : ViewModelBase
     private string _statusMessage = "Готово к работе";
 
     [ObservableProperty]
+    private bool _isSidebarOpen = true;
+
+    [ObservableProperty]
     private RosterCellViewModel? _selectedCell;
 
+    public ObservableCollection<RosterCellViewModel> SelectedCells { get; } = new();
     public ObservableCollection<string> AvailablePosts { get; } = new();
     public ObservableCollection<EmployeeRosterRowViewModel> Rows { get; } = new();
     public ObservableCollection<DayColumnHeaderViewModel> DayHeaders { get; } = new();
@@ -114,40 +121,58 @@ public partial class MainViewModel : ViewModelBase
         OrganizationName = DatabaseService.Instance.GetOrganizationName();
         string orgPrefix = string.IsNullOrWhiteSpace(OrganizationName) ? "" : $"{OrganizationName} — ";
 
-        // Если подразделение еще не настроено
+        // Если подразделение еще не настроено или удалено
         if (string.IsNullOrWhiteSpace(CurrentPostName) || AvailablePosts.Count == 0)
         {
             WindowTitle = $"{orgPrefix}График смен — {CurrentMonthName} {year} (Подразделение не выбрано)";
             Rows.Clear();
-            BalanceStatusBanner = "ℹ️ Подразделения не настроены. Нажмите «🧙 Мастер настройки», чтобы внести смену и сотрудников.";
+            SelectedCells.Clear();
+            SelectedCell = null;
+            BalanceStatusBanner = "ℹ️ Подразделения не настроены. Нажмите «➕ Новая смена» или «🧙 Мастер настройки».";
             BalanceBannerBackground = "#2B3A4A";
-            StatusMessage = "Требуется первичная настройка";
-            ShouldRunWizardOnStartup = true;
+            StatusMessage = "Создайте подразделение для формирования графика";
             return;
         }
 
+        CurrentPostPattern = DatabaseService.Instance.GetPostPattern(CurrentPostName);
         WindowTitle = $"{orgPrefix}График смен — {CurrentMonthName} {year} ({CurrentPostName})";
 
         // Получаем или создаем график в БД
-        _currentSchedule = DatabaseService.Instance.GetOrCreateSchedule(year, month, CurrentPostName, "1/3");
+        _currentSchedule = DatabaseService.Instance.GetOrCreateSchedule(year, month, CurrentPostName, CurrentPostPattern);
 
         // Загружаем ячейки из БД
         var cells = DatabaseService.Instance.GetRosterCells(_currentSchedule.Id);
 
-        // Если ячеек еще нет (новый месяц) — автоматически заполняем по схеме сутки/трое
+        // Если ячеек еще нет (новый месяц) — автоматически заполняем по схеме смены
         if (cells.Count == 0)
         {
             var employees = DatabaseService.Instance.GetEmployees(CurrentPostName);
             if (employees.Count > 0)
             {
-                cells = RosterCalculationService.Instance.AutoFillOneThree(_currentSchedule.Id, employees, year, month);
+                if (CurrentPostPattern == "2/2")
+                {
+                    cells = RosterCalculationService.Instance.AutoFillTwoTwo(_currentSchedule.Id, employees, year, month);
+                }
+                else
+                {
+                    cells = RosterCalculationService.Instance.AutoFillOneThree(_currentSchedule.Id, employees, year, month);
+                }
                 DatabaseService.Instance.SaveRosterCells(_currentSchedule.Id, cells);
             }
         }
 
-        // Построение строк сотрудников
+        // Построение строк сотрудников в ТОЧНОМ порядке, заданном в окне «Штат»
         Rows.Clear();
-        var empGroups = cells.GroupBy(c => c.EmployeeName).OrderBy(g => g.First().IsSubstitute).ThenBy(g => g.Key);
+        SelectedCells.Clear();
+        SelectedCell = null;
+
+        var orderedEmployees = DatabaseService.Instance.GetEmployees(CurrentPostName);
+        var empRankMap = orderedEmployees.Select((e, idx) => (e.FullName, idx)).ToDictionary(x => x.FullName, x => x.idx);
+
+        var empGroups = cells.GroupBy(c => c.EmployeeName)
+            .OrderBy(g => g.First().IsSubstitute)
+            .ThenBy(g => empRankMap.TryGetValue(g.Key, out int r) ? r : 999)
+            .ThenBy(g => g.Key);
 
         foreach (var group in empGroups)
         {
@@ -169,7 +194,7 @@ public partial class MainViewModel : ViewModelBase
         }
 
         RecalculateDayBalancesAndValidate();
-        StatusMessage = $"Загружен график за {CurrentMonthName} {year} г.";
+        StatusMessage = $"Загружен график смены «{CurrentPostName}» ({CurrentMonthName} {year} г.)";
     }
 
     /// <summary>
@@ -178,6 +203,15 @@ public partial class MainViewModel : ViewModelBase
     public void RecalculateDayBalancesAndValidate()
     {
         int daysInMonth = DateTime.DaysInMonth(CurrentYear, CurrentMonth);
+
+        if (Rows.Count == 0)
+        {
+            BalanceStatusBanner = $"ℹ️ В смене «{CurrentPostName}» нет сотрудников. Добавьте работников в карточке «Штат и сотрудники».";
+            BalanceBannerBackground = "#2B3A4A";
+            foreach (var b in DayBalances) b.UpdateHours(0);
+            return;
+        }
+
         int invalidDaysCount = 0;
 
         for (int day = 1; day <= daysInMonth; day++)
@@ -194,7 +228,7 @@ public partial class MainViewModel : ViewModelBase
 
         if (invalidDaysCount == 0)
         {
-            BalanceStatusBanner = $"✅ Баланс круглосуточного поста соблюден: во все {daysInMonth} дней месяца закрыто ровно 24 часа.";
+            BalanceStatusBanner = $"✅ Баланс поста соблюден: во все {daysInMonth} дней месяца на посту закрыто ровно 24 часа.";
             BalanceBannerBackground = "#107C41"; // WinUI Dark Green
         }
         else
@@ -231,103 +265,257 @@ public partial class MainViewModel : ViewModelBase
     }
 
     [RelayCommand]
-    public void SelectCell(RosterCellViewModel cell)
+    public void ToggleSidebar()
     {
+        IsSidebarOpen = !IsSidebarOpen;
+    }
+
+    public void SelectCell(RosterCellViewModel cell, bool isCtrlPressed = false, bool isShiftPressed = false)
+    {
+        if (cell == null) return;
+
+        // Если зажат Shift и есть предыдущая ячейка того же сотрудника — выделяем диапазон
+        if (isShiftPressed && SelectedCell != null)
+        {
+            var row = Rows.FirstOrDefault(r => r.DayCells.Contains(cell));
+            if (row != null && row.DayCells.Contains(SelectedCell))
+            {
+                int minDay = Math.Min(SelectedCell.DayOfMonth, cell.DayOfMonth);
+                int maxDay = Math.Max(SelectedCell.DayOfMonth, cell.DayOfMonth);
+
+                foreach (var c in row.DayCells.Where(c => c.DayOfMonth >= minDay && c.DayOfMonth <= maxDay))
+                {
+                    if (!SelectedCells.Contains(c))
+                    {
+                        c.IsSelected = true;
+                        SelectedCells.Add(c);
+                    }
+                }
+
+                StatusMessage = $"Выделен диапазон: {row.EmployeeName}, дни с {minDay} по {maxDay} ({SelectedCells.Count} ячеек). Выберите статус в палитре.";
+                return;
+            }
+        }
+
+        // Если зажат Ctrl — множественный выбор отдельных ячеек
+        if (isCtrlPressed)
+        {
+            if (cell.IsSelected)
+            {
+                cell.IsSelected = false;
+                SelectedCells.Remove(cell);
+                SelectedCell = SelectedCells.LastOrDefault();
+            }
+            else
+            {
+                cell.IsSelected = true;
+                SelectedCells.Add(cell);
+                SelectedCell = cell;
+            }
+            StatusMessage = $"Выделено ячеек: {SelectedCells.Count}. Выберите статус в нижней палитре.";
+            return;
+        }
+
+        // Одиночный клик без модификаторов — сбрасываем предыдущие выделения
+        foreach (var c in SelectedCells)
+        {
+            c.IsSelected = false;
+        }
+        SelectedCells.Clear();
+
         if (SelectedCell != null)
         {
             SelectedCell.IsSelected = false;
         }
 
         SelectedCell = cell;
-        if (SelectedCell != null)
-        {
-            SelectedCell.IsSelected = true;
-            StatusMessage = $"Выбрана ячейка: {cell.Model.EmployeeName}, день {cell.DayOfMonth} ({cell.ShiftCode}, {cell.TotalHours} ч)";
-        }
+        cell.IsSelected = true;
+        SelectedCells.Add(cell);
+        StatusMessage = $"Выбрана ячейка: {cell.Model.EmployeeName}, день {cell.DayOfMonth} ({cell.ShiftCode}, {cell.TotalHours} ч). Зажмите Shift для диапазона.";
     }
 
     [RelayCommand]
     public void ApplyShift(string shiftType)
     {
-        if (SelectedCell == null)
+        var targets = SelectedCells.Count > 0 ? SelectedCells.ToList() : (SelectedCell != null ? new List<RosterCellViewModel> { SelectedCell } : new List<RosterCellViewModel>());
+
+        if (targets.Count == 0)
         {
-            StatusMessage = "Сначала выберите ячейку в таблице!";
+            StatusMessage = "Сначала выберите одну или несколько ячеек в таблице!";
             return;
         }
 
-        switch (shiftType)
+        var affectedRows = new HashSet<EmployeeRosterRowViewModel>();
+
+        foreach (var target in targets)
         {
-            case "16":
-                SelectedCell.SetShift("16", 14.0, 2.0);
-                break;
-            case "8":
-                SelectedCell.SetShift("8", 2.0, 6.0);
-                break;
-            case "С24":
-                SelectedCell.SetShift("С24", 16.0, 8.0);
-                break;
-            case "Д12":
-                SelectedCell.SetShift("Д12", 12.0, 0.0);
-                break;
-            case "Н12":
-                SelectedCell.SetShift("Н12", 0.0, 12.0);
-                break;
-            case "В":
-                SelectedCell.SetShift("В", 0.0, 0.0);
-                break;
-            case "О":
-                SelectedCell.SetShift("О", 0.0, 0.0);
-                break;
-            case "Б":
-                SelectedCell.SetShift("Б", 0.0, 0.0);
-                break;
+            switch (shiftType)
+            {
+                case "16":
+                    target.SetShift("16", 14.0, 2.0);
+                    break;
+                case "8":
+                    target.SetShift("8", 2.0, 6.0);
+                    break;
+                case "С24":
+                    target.SetShift("С24", 16.0, 8.0);
+                    break;
+                case "Д12":
+                    target.SetShift("Д12", 12.0, 0.0);
+                    break;
+                case "Н12":
+                    target.SetShift("Н12", 0.0, 12.0);
+                    break;
+                case "В":
+                    target.SetShift("В", 0.0, 0.0);
+                    break;
+                case "О":
+                    target.SetShift("О", 0.0, 0.0);
+                    break;
+                case "Б":
+                    target.SetShift("Б", 0.0, 0.0);
+                    break;
+            }
+
+            var row = Rows.FirstOrDefault(r => r.DayCells.Contains(target));
+            if (row != null) affectedRows.Add(row);
         }
 
-        // Пересчитываем итоги по строке и по суточному балансу
-        var row = Rows.FirstOrDefault(r => r.DayCells.Contains(SelectedCell));
-        row?.RecalculateSummary(CurrentYear, CurrentMonth);
+        foreach (var row in affectedRows)
+        {
+            row.RecalculateSummary(CurrentYear, CurrentMonth);
+        }
 
         RecalculateDayBalancesAndValidate();
         SaveRoster();
-        StatusMessage = $"Смена обновлена: {SelectedCell.ShiftCode} ({SelectedCell.TotalHours} ч)";
+
+        string shiftLabel = shiftType switch
+        {
+            "О" => "Отпуск (О)",
+            "Б" => "Больничный (Б)",
+            "В" => "Выходной (В)",
+            "16" => "16ч (Заступление)",
+            "8" => "8ч (Сдача)",
+            "Д12" => "12ч День",
+            "Н12" => "12ч Ночь",
+            _ => shiftType
+        };
+
+        StatusMessage = targets.Count == 1 
+            ? $"Смена обновлена: {shiftLabel}" 
+            : $"Статус «{shiftLabel}» применен к {targets.Count} ячейкам.";
     }
 
-    [RelayCommand]
-    public void AutoFillOneThree()
+    /// <summary>
+    /// Массовое назначение периода отсутствия (отпуск/больничный/выходной) для сотрудника
+    /// </summary>
+    public void ApplyRangeForEmployee(string employeeName, string shiftCode, int startDay, int endDay)
     {
-        if (_currentSchedule == null) return;
+        var row = Rows.FirstOrDefault(r => r.EmployeeName == employeeName);
+        if (row == null) return;
 
+        double dHours = 0, nHours = 0;
+        switch (shiftCode)
+        {
+            case "16": dHours = 14.0; nHours = 2.0; break;
+            case "8": dHours = 2.0; nHours = 6.0; break;
+            case "Д12": dHours = 12.0; nHours = 0.0; break;
+            case "Н12": dHours = 0.0; nHours = 12.0; break;
+            case "В":
+            case "О":
+            case "Б":
+            default:
+                dHours = 0.0; nHours = 0.0; break;
+        }
+
+        int count = 0;
+        foreach (var cell in row.DayCells.Where(c => c.DayOfMonth >= startDay && c.DayOfMonth <= endDay))
+        {
+            cell.SetShift(shiftCode, dHours, nHours);
+            count++;
+        }
+
+        row.RecalculateSummary(CurrentYear, CurrentMonth);
+        RecalculateDayBalancesAndValidate();
+        SaveRoster();
+
+        string codeLabel = shiftCode == "О" ? "Отпуск (О)" : (shiftCode == "Б" ? "Больничный (Б)" : shiftCode);
+        StatusMessage = $"Сотруднику «{employeeName}» назначен статус «{codeLabel}» с {startDay} по {endDay} число ({count} дн.).";
+    }
+
+    /// <summary>
+    /// Автозаполнение текущего графика по схеме подразделения (1/3 или 2/2)
+    /// </summary>
+    [RelayCommand]
+    public void AutoFillCurrentSchedule()
+    {
+        if (_currentSchedule == null || string.IsNullOrWhiteSpace(CurrentPostName)) return;
+
+        string pattern = DatabaseService.Instance.GetPostPattern(CurrentPostName);
         var employees = DatabaseService.Instance.GetEmployees(CurrentPostName);
+
         if (employees.Count == 0)
         {
-            StatusMessage = "Нет активных сотрудников для автозаполнения!";
+            StatusMessage = "В подразделении нет сотрудников для заполнения графика!";
             return;
         }
 
-        var cells = RosterCalculationService.Instance.AutoFillOneThree(_currentSchedule.Id, employees, CurrentYear, CurrentMonth);
-        DatabaseService.Instance.SaveRosterCells(_currentSchedule.Id, cells);
+        List<RosterCell> cells;
+        if (pattern == "2/2")
+        {
+            cells = RosterCalculationService.Instance.AutoFillTwoTwo(_currentSchedule.Id, employees, CurrentYear, CurrentMonth);
+            StatusMessage = "График заполнен по схеме «2 через 2» (по 12ч День/Ночь).";
+        }
+        else
+        {
+            cells = RosterCalculationService.Instance.AutoFillOneThree(_currentSchedule.Id, employees, CurrentYear, CurrentMonth);
+            StatusMessage = "График заполнен по схеме «Сутки через трое» (16ч/8ч, 24ч на пост).";
+        }
 
+        DatabaseService.Instance.SaveRosterCells(_currentSchedule.Id, cells);
         LoadMonth(CurrentYear, CurrentMonth);
-        StatusMessage = "График успешно заполнен по схеме «Сутки через трое» (24ч на пост)!";
     }
 
     [RelayCommand]
-    public void AutoFillTwoTwo()
+    public void ClearCurrentMonthRoster()
     {
         if (_currentSchedule == null) return;
 
-        var employees = DatabaseService.Instance.GetEmployees(CurrentPostName);
-        if (employees.Count < 4)
+        foreach (var row in Rows)
         {
-            StatusMessage = "Для схемы «2 через 2» требуется минимум 4 сотрудника!";
-            return;
+            foreach (var cell in row.DayCells)
+            {
+                cell.SetShift("В", 0, 0);
+            }
+            row.RecalculateSummary(CurrentYear, CurrentMonth);
         }
 
-        var cells = RosterCalculationService.Instance.AutoFillTwoTwo(_currentSchedule.Id, employees, CurrentYear, CurrentMonth);
-        DatabaseService.Instance.SaveRosterCells(_currentSchedule.Id, cells);
+        RecalculateDayBalancesAndValidate();
+        SaveRoster();
+        StatusMessage = "Все смены текущего месяца очищены (выставлены Выходные 'В').";
+    }
+
+    public void DeleteCurrentPost()
+    {
+        if (string.IsNullOrWhiteSpace(CurrentPostName)) return;
+
+        string deletedPost = CurrentPostName;
+        DatabaseService.Instance.DeletePost(deletedPost);
+
+        RefreshPosts();
+        if (AvailablePosts.Count > 0)
+        {
+            SelectedPost = AvailablePosts[0];
+            CurrentPostName = SelectedPost;
+        }
+        else
+        {
+            SelectedPost = string.Empty;
+            CurrentPostName = string.Empty;
+        }
 
         LoadMonth(CurrentYear, CurrentMonth);
-        StatusMessage = "График успешно заполнен по схеме «2 через 2» (День 12ч / Ночь 12ч)!";
+        StatusMessage = $"Подразделение «{deletedPost}» успешно удалено.";
     }
 
     [RelayCommand]
@@ -380,11 +568,12 @@ public partial class MainViewModel : ViewModelBase
             {
                 Directory.CreateDirectory(exportDir);
             }
-            targetFilePath = Path.Combine(exportDir, $"График_Смен_{CurrentMonthName}_{CurrentYear}.xlsx");
+            string safePostName = CurrentPostName.Replace(" ", "_").Replace("/", "_").Replace("\\", "_");
+            targetFilePath = Path.Combine(exportDir, $"График_Смен_{safePostName}_{CurrentMonthName}_{CurrentYear}.xlsx");
         }
 
         ExcelExportService.Instance.ExportRosterToExcel(targetFilePath, _currentSchedule, allCells, summaries);
-        StatusMessage = $"Табель успешно экспортирован в Excel: {Path.GetFileName(targetFilePath)}";
+        StatusMessage = $"Табель смены «{CurrentPostName}» экспортирован в Excel: {Path.GetFileName(targetFilePath)}";
         return targetFilePath;
     }
 
@@ -398,14 +587,22 @@ public partial class MainViewModel : ViewModelBase
 
         foreach (var post in allPosts)
         {
-            var schedule = DatabaseService.Instance.GetOrCreateSchedule(CurrentYear, CurrentMonth, post, "1/3");
+            string pattern = DatabaseService.Instance.GetPostPattern(post);
+            var schedule = DatabaseService.Instance.GetOrCreateSchedule(CurrentYear, CurrentMonth, post, pattern);
             var cells = DatabaseService.Instance.GetRosterCells(schedule.Id);
             if (cells.Count == 0)
             {
                 var employees = DatabaseService.Instance.GetEmployees(post);
                 if (employees.Count > 0)
                 {
-                    cells = RosterCalculationService.Instance.AutoFillOneThree(schedule.Id, employees, CurrentYear, CurrentMonth);
+                    if (pattern == "2/2")
+                    {
+                        cells = RosterCalculationService.Instance.AutoFillTwoTwo(schedule.Id, employees, CurrentYear, CurrentMonth);
+                    }
+                    else
+                    {
+                        cells = RosterCalculationService.Instance.AutoFillOneThree(schedule.Id, employees, CurrentYear, CurrentMonth);
+                    }
                     DatabaseService.Instance.SaveRosterCells(schedule.Id, cells);
                 }
             }
@@ -426,7 +623,7 @@ public partial class MainViewModel : ViewModelBase
         }
 
         ExcelExportService.Instance.ExportConsolidatedRosterToExcel(targetFilePath, CurrentYear, CurrentMonth, postDataList);
-        StatusMessage = $"Сводный отчет по всем {allPosts.Count} сменам экспортирован: {Path.GetFileName(targetFilePath)}";
+        StatusMessage = $"Сводный отчет по всем {allPosts.Count} подразделениям экспортирован: {Path.GetFileName(targetFilePath)}";
         return targetFilePath;
     }
 

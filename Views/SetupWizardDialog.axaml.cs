@@ -135,6 +135,7 @@ public partial class SetupWizardDialog : Window
             }
 
             // Сохраняем сотрудников в базу данных SQLite
+            int sortOrder = 1;
             foreach (var empItem in validEmps)
             {
                 var emp = new Employee
@@ -142,8 +143,9 @@ public partial class SetupWizardDialog : Window
                     FullName = empItem.FullName.Trim(),
                     Position = string.IsNullOrWhiteSpace(empItem.Position) ? "Оператор" : empItem.Position.Trim(),
                     PostName = depName,
-                    InitialShiftDay = empItem.InitialShiftDay,
+                    InitialShiftDay = (int)empItem.InitialShiftDay,
                     ShiftPattern = pattern,
+                    SortOrder = sortOrder++,
                     IsPermanent = true,
                     IsActive = true
                 };

@@ -162,6 +162,45 @@ public static class VerificationTests
         }
         Console.WriteLine($"[УСПЕХ] (Организация: {storedOrg})");
 
+        // 8. Проверка изменения порядка сотрудников (SortOrder)
+        Console.Write("8. Изменение порядка сотрудников (SortOrder)... ");
+        var empsBefore = db.GetEmployees(firstPost);
+        if (empsBefore.Count >= 2)
+        {
+            var reordered = new List<Employee>(empsBefore);
+            var temp = reordered[0];
+            reordered[0] = reordered[1];
+            reordered[1] = temp;
+            db.UpdateEmployeesOrder(reordered);
+            var empsAfter = db.GetEmployees(firstPost);
+            if (empsAfter[0].Id != reordered[0].Id)
+            {
+                throw new Exception("Порядок сотрудников не обновился в соответствии с SortOrder!");
+            }
+        }
+        Console.WriteLine("[УСПЕХ] (Сортировка по SortOrder работает корректно)");
+
+        // 9. Проверка удаления подразделения (каскадное удаление без сбоев)
+        Console.Write("9. Удаление ненужной смены (DeletePost)... ");
+        string tempPostName = "Временная смена для проверки удаления";
+        db.SaveEmployee(new Employee { FullName = "Временный Работник", Position = "Оператор", PostName = tempPostName, InitialShiftDay = 1 });
+        var tempSched = db.GetOrCreateSchedule(testYear, testMonth, tempPostName, "1/3");
+        var tempCells = calc.AutoFillOneThree(tempSched.Id, db.GetEmployees(tempPostName), testYear, testMonth);
+        db.SaveRosterCells(tempSched.Id, tempCells);
+
+        db.DeletePost(tempPostName);
+        var remainingPosts = db.GetAllPostNames();
+        if (remainingPosts.Contains(tempPostName))
+        {
+            throw new Exception("Смена не удалилась из базы данных!");
+        }
+        var orphanEmployees = db.GetEmployees(tempPostName);
+        if (orphanEmployees.Count > 0)
+        {
+            throw new Exception("Сотрудники удаленной смены остались в базе!");
+        }
+        Console.WriteLine("[УСПЕХ] (Смена и ее данные полностью удалены без ошибок)");
+
         Console.WriteLine("=================================================");
         Console.WriteLine("ВСЕ ТЕСТЫ И ТРЕБОВАНИЯ ТЗ УСПЕШНО ВЫПОЛНЕНЫ!");
         Console.WriteLine("=================================================");

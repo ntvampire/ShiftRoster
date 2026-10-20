@@ -22,6 +22,11 @@ public class Employee
     public int InitialShiftDay { get; set; } = 1;
 
     /// <summary>
+    /// Порядок отображения сотрудника в таблице графика (для сортировки вверх/вниз)
+    /// </summary>
+    public int SortOrder { get; set; } = 0;
+
+    /// <summary>
     /// Тип графика для сотрудника ("1/3", "2/2-День", "2/2-Ночь")
     /// </summary>
     public string ShiftPattern { get; set; } = "1/3";
