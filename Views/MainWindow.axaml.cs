@@ -321,44 +321,88 @@ public partial class MainWindow : Window
         }
     }
 
-    private void OnCellContextMenuOpening(object? sender, CancelEventArgs e)
+    public void OnCellPointerReleased(object? sender, PointerReleasedEventArgs e)
     {
-        if (sender is not ContextMenu cm || DataContext is not MainViewModel vm)
+        if (sender is not Button btn || btn.DataContext is not RosterCellViewModel cellVm || DataContext is not MainViewModel vm)
             return;
 
-        // Если контекстное меню открыто для ячейки, которая еще не выделена — выделяем ее
-        if (cm.PlacementTarget is Button btn && btn.DataContext is RosterCellViewModel cellVm)
+        var props = e.GetCurrentPoint(btn).Properties;
+        if (e.InitialPressMouseButton == MouseButton.Right || props.PointerUpdateKind == PointerUpdateKind.RightButtonReleased)
         {
-            if (!vm.SelectedCells.Contains(cellVm))
-            {
-                vm.SelectCell(cellVm, isCtrlPressed: false, isShiftPressed: false);
-            }
-        }
-
-        // Динамически настраиваем видимость рабочих смен согласно выбранному режиму смены (1/3 или 2/2)
-        bool is22 = vm.CurrentPostPattern == "2/2";
-        foreach (var obj in cm.Items)
-        {
-            if (obj is MenuItem mi && mi.Tag is string tag)
-            {
-                if (tag is "16" or "8")
-                {
-                    mi.IsVisible = !is22;
-                }
-                else if (tag is "Д12" or "Н12")
-                {
-                    mi.IsVisible = is22;
-                }
-            }
+            ShowCellContextMenu(btn, cellVm, vm);
+            e.Handled = true;
         }
     }
 
-    private void OnMenuShiftClicked(object? sender, RoutedEventArgs e)
+    public void OnCellContextRequested(object? sender, ContextRequestedEventArgs e)
     {
-        if (sender is MenuItem mi && mi.Tag is string shiftCode && DataContext is MainViewModel vm)
+        if (sender is not Button btn || btn.DataContext is not RosterCellViewModel cellVm || DataContext is not MainViewModel vm)
+            return;
+
+        ShowCellContextMenu(btn, cellVm, vm);
+        e.Handled = true;
+    }
+
+    private long _lastMenuOpenTimestamp;
+
+    private void ShowCellContextMenu(Button btn, RosterCellViewModel cellVm, MainViewModel vm)
+    {
+        long now = Environment.TickCount64;
+        if (now - _lastMenuOpenTimestamp < 200)
+            return;
+        _lastMenuOpenTimestamp = now;
+
+        // Если ячейка не входит в текущее выделение — выделяем ее
+        if (!vm.SelectedCells.Contains(cellVm))
         {
-            vm.ApplyShift(shiftCode);
+            vm.SelectCell(cellVm, isCtrlPressed: false, isShiftPressed: false);
         }
+
+        var menu = new ContextMenu();
+        var items = new System.Collections.Generic.List<object>();
+
+        // 1. Фиксированные статусы отсутствия и отдыха
+        var itemSick = new MenuItem { Header = "🏥 Больничный лист (Б)" };
+        itemSick.Click += (_, _) => vm.ApplyShift("Б");
+        items.Add(itemSick);
+
+        var itemVacation = new MenuItem { Header = "🏖️ Отпуск (О)" };
+        itemVacation.Click += (_, _) => vm.ApplyShift("О");
+        items.Add(itemVacation);
+
+        var itemOff = new MenuItem { Header = "⚪ Выходной день (В)" };
+        itemOff.Click += (_, _) => vm.ApplyShift("В");
+        items.Add(itemOff);
+
+        items.Add(new Separator());
+
+        // 2. Рабочие смены согласно выбранному режиму подразделения
+        if (vm.CurrentPostPattern == "2/2")
+        {
+            var itemDay12 = new MenuItem { Header = "☀️ 12ч День (Д12)" };
+            itemDay12.Click += (_, _) => vm.ApplyShift("Д12");
+            items.Add(itemDay12);
+
+            var itemNight12 = new MenuItem { Header = "🌙 12ч Ночь (Н12)" };
+            itemNight12.Click += (_, _) => vm.ApplyShift("Н12");
+            items.Add(itemNight12);
+        }
+        else
+        {
+            var item16 = new MenuItem { Header = "⏱️ 16ч (Заступление)" };
+            item16.Click += (_, _) => vm.ApplyShift("16");
+            items.Add(item16);
+
+            var item8 = new MenuItem { Header = "⏱️ 8ч (Сдача)" };
+            item8.Click += (_, _) => vm.ApplyShift("8");
+            items.Add(item8);
+        }
+
+        menu.ItemsSource = items;
+        // Открываем контекстное меню прямо над кнопкой целевой ячейки.
+        // btn.ContextMenu намеренно НЕ устанавливаем (оставляем null),
+        // чтобы нативные обработчики классов Avalonia не перехватывали последующие клики!
+        menu.Open(btn);
     }
 
     private async void OnAddNewPostClicked(object? sender, RoutedEventArgs e)

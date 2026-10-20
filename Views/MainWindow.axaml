@@ -299,19 +299,9 @@
                                                                 BorderThickness="1"
                                                                 ToolTip.Tip="{Binding TooltipText}"
                                                                 Click="OnCellButtonClicked"
-                                                                PointerPressed="OnCellPointerPressed">
-                                                            <Button.ContextMenu>
-                                                                <ContextMenu Opening="OnCellContextMenuOpening">
-                                                                    <MenuItem Header="🏥 Больничный лист (Б)" Click="OnMenuShiftClicked" Tag="Б" />
-                                                                    <MenuItem Header="🏖️ Отпуск (О)" Click="OnMenuShiftClicked" Tag="О" />
-                                                                    <MenuItem Header="⚪ Выходной день (В)" Click="OnMenuShiftClicked" Tag="В" />
-                                                                    <Separator />
-                                                                    <MenuItem Header="⏱️ 16ч (Заступление)" Click="OnMenuShiftClicked" Tag="16" />
-                                                                    <MenuItem Header="⏱️ 8ч (Сдача)" Click="OnMenuShiftClicked" Tag="8" />
-                                                                    <MenuItem Header="☀️ 12ч День (Д12)" Click="OnMenuShiftClicked" Tag="Д12" />
-                                                                    <MenuItem Header="🌙 12ч Ночь (Н12)" Click="OnMenuShiftClicked" Tag="Н12" />
-                                                                </ContextMenu>
-                                                            </Button.ContextMenu>
+                                                                PointerPressed="OnCellPointerPressed"
+                                                                PointerReleased="OnCellPointerReleased"
+                                                                ContextRequested="OnCellContextRequested">
                                                             <TextBlock Text="{Binding DisplayText}" 
                                                                        FontWeight="SemiBold" FontSize="12" 
                                                                        Foreground="White"
