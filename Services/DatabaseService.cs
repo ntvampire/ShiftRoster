@@ -24,6 +24,16 @@ public class DatabaseService
     public string DatabasePath => _dbPath;
     public string BackupsDirectory => _backupsDir;
 
+    public SqliteConnection CreateOpenConnection()
+    {
+        var conn = new SqliteConnection(_connectionString);
+        conn.Open();
+        using var pragmaCmd = conn.CreateCommand();
+        pragmaCmd.CommandText = "PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL;";
+        pragmaCmd.ExecuteNonQuery();
+        return conn;
+    }
+
     public DatabaseService()
     {
         string baseDir = AppDomain.CurrentDomain.BaseDirectory;
@@ -155,6 +165,8 @@ public class DatabaseService
             CREATE TABLE IF NOT EXISTS SubstituteNames (
                 Id INTEGER PRIMARY KEY AUTOINCREMENT,
                 FullName TEXT NOT NULL UNIQUE,
+                Position TEXT NOT NULL DEFAULT 'Оператор (подмена)',
+                DefaultReplacedEmployee TEXT,
                 LastUsedAt TEXT NOT NULL
             );
 
@@ -187,6 +199,22 @@ public class DatabaseService
             using var alterCmd3 = connection.CreateCommand();
             alterCmd3.CommandText = "ALTER TABLE Employees ADD COLUMN SortOrder INTEGER NOT NULL DEFAULT 0";
             alterCmd3.ExecuteNonQuery();
+        }
+        catch { }
+
+        try
+        {
+            using var alterCmd4 = connection.CreateCommand();
+            alterCmd4.CommandText = "ALTER TABLE SubstituteNames ADD COLUMN Position TEXT NOT NULL DEFAULT 'Оператор (подмена)'";
+            alterCmd4.ExecuteNonQuery();
+        }
+        catch { }
+
+        try
+        {
+            using var alterCmd5 = connection.CreateCommand();
+            alterCmd5.CommandText = "ALTER TABLE SubstituteNames ADD COLUMN DefaultReplacedEmployee TEXT";
+            alterCmd5.ExecuteNonQuery();
         }
         catch { }
     }
@@ -655,8 +683,7 @@ public class DatabaseService
 
     public void SaveRosterCells(int scheduleId, IEnumerable<RosterCell> cells)
     {
-        using var conn = new SqliteConnection(_connectionString);
-        conn.Open();
+        using var conn = CreateOpenConnection();
         using var transaction = conn.BeginTransaction();
 
         // Удаляем существующие ячейки для этого графика и записываем актуальные
@@ -666,30 +693,45 @@ public class DatabaseService
         delCmd.Parameters.AddWithValue("@sid", scheduleId);
         delCmd.ExecuteNonQuery();
 
+        using var insCmd = conn.CreateCommand();
+        insCmd.Transaction = transaction;
+        insCmd.CommandText = @"
+            INSERT INTO RosterCells (
+                ScheduleId, EmployeeId, EmployeeName, Position, DayOfMonth,
+                ShiftCode, DayHours, NightHours, TotalHours, IsSubstitute, SubstitutedForName, Notes
+            ) VALUES (
+                @sid, @eid, @ename, @pos, @day,
+                @code, @dh, @nh, @th, @sub, @subfor, @notes
+            )";
+
+        var pSid = insCmd.Parameters.Add("@sid", SqliteType.Integer);
+        var pEid = insCmd.Parameters.Add("@eid", SqliteType.Integer);
+        var pEname = insCmd.Parameters.Add("@ename", SqliteType.Text);
+        var pPos = insCmd.Parameters.Add("@pos", SqliteType.Text);
+        var pDay = insCmd.Parameters.Add("@day", SqliteType.Integer);
+        var pCode = insCmd.Parameters.Add("@code", SqliteType.Text);
+        var pDh = insCmd.Parameters.Add("@dh", SqliteType.Real);
+        var pNh = insCmd.Parameters.Add("@nh", SqliteType.Real);
+        var pTh = insCmd.Parameters.Add("@th", SqliteType.Real);
+        var pSub = insCmd.Parameters.Add("@sub", SqliteType.Integer);
+        var pSubFor = insCmd.Parameters.Add("@subfor", SqliteType.Text);
+        var pNotes = insCmd.Parameters.Add("@notes", SqliteType.Text);
+
+        pSid.Value = scheduleId;
+
         foreach (var cell in cells)
         {
-            using var insCmd = conn.CreateCommand();
-            insCmd.Transaction = transaction;
-            insCmd.CommandText = @"
-                INSERT INTO RosterCells (
-                    ScheduleId, EmployeeId, EmployeeName, Position, DayOfMonth,
-                    ShiftCode, DayHours, NightHours, TotalHours, IsSubstitute, SubstitutedForName, Notes
-                ) VALUES (
-                    @sid, @eid, @ename, @pos, @day,
-                    @code, @dh, @nh, @th, @sub, @subfor, @notes
-                )";
-            insCmd.Parameters.AddWithValue("@sid", scheduleId);
-            insCmd.Parameters.AddWithValue("@eid", (object?)cell.EmployeeId ?? DBNull.Value);
-            insCmd.Parameters.AddWithValue("@ename", cell.EmployeeName);
-            insCmd.Parameters.AddWithValue("@pos", cell.Position);
-            insCmd.Parameters.AddWithValue("@day", cell.DayOfMonth);
-            insCmd.Parameters.AddWithValue("@code", cell.ShiftCode);
-            insCmd.Parameters.AddWithValue("@dh", cell.DayHours);
-            insCmd.Parameters.AddWithValue("@nh", cell.NightHours);
-            insCmd.Parameters.AddWithValue("@th", cell.TotalHours);
-            insCmd.Parameters.AddWithValue("@sub", cell.IsSubstitute ? 1 : 0);
-            insCmd.Parameters.AddWithValue("@subfor", (object?)cell.SubstitutedForName ?? DBNull.Value);
-            insCmd.Parameters.AddWithValue("@notes", (object?)cell.Notes ?? DBNull.Value);
+            pEid.Value = (object?)cell.EmployeeId ?? DBNull.Value;
+            pEname.Value = cell.EmployeeName;
+            pPos.Value = cell.Position;
+            pDay.Value = cell.DayOfMonth;
+            pCode.Value = cell.ShiftCode;
+            pDh.Value = cell.DayHours;
+            pNh.Value = cell.NightHours;
+            pTh.Value = cell.TotalHours;
+            pSub.Value = cell.IsSubstitute ? 1 : 0;
+            pSubFor.Value = (object?)cell.SubstitutedForName ?? DBNull.Value;
+            pNotes.Value = (object?)cell.Notes ?? DBNull.Value;
 
             insCmd.ExecuteNonQuery();
         }
@@ -698,38 +740,85 @@ public class DatabaseService
     }
 
     // --- Список ранее использованных подменных работников ---
-    public List<string> GetRecentSubstituteNames()
+    public List<SubstituteRecord> GetSubstitutes()
     {
-        var result = new List<string>();
-        using var conn = new SqliteConnection(_connectionString);
-        conn.Open();
+        var result = new List<SubstituteRecord>();
+        using var conn = CreateOpenConnection();
 
         using var cmd = conn.CreateCommand();
-        cmd.CommandText = "SELECT FullName FROM SubstituteNames ORDER BY LastUsedAt DESC LIMIT 20";
+        cmd.CommandText = "SELECT Id, FullName, Position, DefaultReplacedEmployee, LastUsedAt FROM SubstituteNames ORDER BY LastUsedAt DESC";
 
         using var reader = cmd.ExecuteReader();
         while (reader.Read())
         {
-            result.Add(reader.GetString(0));
+            result.Add(new SubstituteRecord
+            {
+                Id = reader.GetInt32(0),
+                FullName = reader.GetString(1),
+                Position = reader.IsDBNull(2) ? "Оператор (подмена)" : reader.GetString(2),
+                DefaultReplacedEmployee = reader.IsDBNull(3) ? null : reader.GetString(3),
+                LastUsedAt = DateTime.TryParse(reader.GetString(4), out var dt) ? dt : DateTime.Now
+            });
         }
         return result;
     }
 
-    public void RecordSubstituteName(string fullName)
+    public SubstituteRecord? GetSubstituteForEmployee(string employeeName)
+    {
+        if (string.IsNullOrWhiteSpace(employeeName)) return null;
+
+        using var conn = CreateOpenConnection();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = "SELECT Id, FullName, Position, DefaultReplacedEmployee, LastUsedAt FROM SubstituteNames WHERE DefaultReplacedEmployee = @emp ORDER BY LastUsedAt DESC LIMIT 1";
+        cmd.Parameters.AddWithValue("@emp", employeeName.Trim());
+
+        using var reader = cmd.ExecuteReader();
+        if (reader.Read())
+        {
+            return new SubstituteRecord
+            {
+                Id = reader.GetInt32(0),
+                FullName = reader.GetString(1),
+                Position = reader.IsDBNull(2) ? "Оператор (подмена)" : reader.GetString(2),
+                DefaultReplacedEmployee = reader.IsDBNull(3) ? null : reader.GetString(3),
+                LastUsedAt = DateTime.TryParse(reader.GetString(4), out var dt) ? dt : DateTime.Now
+            };
+        }
+        return null;
+    }
+
+    public void SaveSubstitute(string fullName, string position, string? replacedEmployee = null)
     {
         if (string.IsNullOrWhiteSpace(fullName)) return;
 
-        using var conn = new SqliteConnection(_connectionString);
-        conn.Open();
+        string cleanName = fullName.Trim();
+        string cleanPos = string.IsNullOrWhiteSpace(position) ? "Оператор (подмена)" : position.Trim();
+        string? cleanRep = string.IsNullOrWhiteSpace(replacedEmployee) ? null : replacedEmployee.Trim();
 
+        using var conn = CreateOpenConnection();
         using var cmd = conn.CreateCommand();
         cmd.CommandText = @"
-            INSERT INTO SubstituteNames (FullName, LastUsedAt)
-            VALUES (@name, @now)
-            ON CONFLICT(FullName) DO UPDATE SET LastUsedAt = @now";
-        cmd.Parameters.AddWithValue("@name", fullName.Trim());
+            INSERT INTO SubstituteNames (FullName, Position, DefaultReplacedEmployee, LastUsedAt)
+            VALUES (@name, @pos, @rep, @now)
+            ON CONFLICT(FullName) DO UPDATE SET 
+                Position = @pos,
+                DefaultReplacedEmployee = COALESCE(@rep, DefaultReplacedEmployee),
+                LastUsedAt = @now";
+        cmd.Parameters.AddWithValue("@name", cleanName);
+        cmd.Parameters.AddWithValue("@pos", cleanPos);
+        cmd.Parameters.AddWithValue("@rep", (object?)cleanRep ?? DBNull.Value);
         cmd.Parameters.AddWithValue("@now", DateTime.Now.ToString("o"));
         cmd.ExecuteNonQuery();
+    }
+
+    public List<string> GetRecentSubstituteNames()
+    {
+        return GetSubstitutes().Select(s => s.FullName).ToList();
+    }
+
+    public void RecordSubstituteName(string fullName)
+    {
+        SaveSubstitute(fullName, "Оператор (подмена)");
     }
 
     // --- Праздничные дни календаря ---

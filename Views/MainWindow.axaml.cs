@@ -45,11 +45,69 @@ public partial class MainWindow : Window
         if (e.Key is Key.LeftShift or Key.RightShift) _isShiftPressed = false;
     }
 
+    private bool _isShowingSubstituteDialog;
+
     private async void OnMainWindowLoaded(object? sender, RoutedEventArgs e)
     {
-        if (DataContext is MainViewModel vm && vm.ShouldRunWizardOnStartup)
+        if (DataContext is MainViewModel vm)
         {
-            await OpenSetupWizardAsync(vm);
+            vm.AbsenceAssigned -= OnAbsenceAssigned;
+            vm.AbsenceAssigned += OnAbsenceAssigned;
+
+            if (vm.ShouldRunWizardOnStartup)
+            {
+                await OpenSetupWizardAsync(vm);
+            }
+        }
+    }
+
+    private async void OnAbsenceAssigned(AbsenceAssignedEventArgs args)
+    {
+        if (_isShowingSubstituteDialog || DataContext is not MainViewModel vm) return;
+
+        var employeeNames = vm.Rows
+            .Where(r => !r.IsSubstitute)
+            .Select(r => r.EmployeeName)
+            .Distinct()
+            .ToList();
+
+        if (employeeNames.Count == 0) return;
+
+        _isShowingSubstituteDialog = true;
+        try
+        {
+            int maxDays = DateTime.DaysInMonth(vm.CurrentYear, vm.CurrentMonth);
+            var existing = vm.GetExistingAbsencesInMonth();
+
+            var subDialog = new AssignSubstituteDialog();
+            subDialog.Initialize(
+                employeeNames,
+                maxDays,
+                existing,
+                preselectedEmployee: args.EmployeeName,
+                preselectedStartDay: args.StartDay,
+                preselectedEndDay: args.EndDay,
+                preselectedReason: args.AbsenceCode);
+
+            bool result = await subDialog.ShowDialog<bool>(this);
+            if (result && !string.IsNullOrWhiteSpace(subDialog.EnteredSubstituteFullName))
+            {
+                vm.AssignSubstitute(
+                    subDialog.SelectedMainEmployeeName,
+                    subDialog.EnteredSubstituteFullName,
+                    subDialog.EnteredSubstitutePosition,
+                    subDialog.StartDay,
+                    subDialog.EndDay,
+                    subDialog.ReasonCode);
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"Ошибка в диалоге назначения подменного: {ex.Message}");
+        }
+        finally
+        {
+            _isShowingSubstituteDialog = false;
         }
     }
 
@@ -212,6 +270,7 @@ public partial class MainWindow : Window
                     vm.AssignSubstitute(
                         subDialog.SelectedMainEmployeeName,
                         subDialog.EnteredSubstituteFullName,
+                        subDialog.EnteredSubstitutePosition,
                         subDialog.StartDay,
                         subDialog.EndDay,
                         subDialog.ReasonCode);
@@ -248,6 +307,7 @@ public partial class MainWindow : Window
             vm.AssignSubstitute(
                 dialog.SelectedMainEmployeeName,
                 dialog.EnteredSubstituteFullName,
+                dialog.EnteredSubstitutePosition,
                 dialog.StartDay,
                 dialog.EndDay,
                 dialog.ReasonCode);

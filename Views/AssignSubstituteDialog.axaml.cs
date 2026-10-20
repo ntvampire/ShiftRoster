@@ -11,9 +11,12 @@ namespace ShiftRoster.Views;
 public partial class AssignSubstituteDialog : Window
 {
     private List<ExistingAbsencePeriod> _existingAbsences = new();
+    private List<SubstituteRecord> _savedSubstitutes = new();
+    private bool _isUpdatingInternally;
 
     public string SelectedMainEmployeeName { get; private set; } = string.Empty;
     public string EnteredSubstituteFullName { get; private set; } = string.Empty;
+    public string EnteredSubstitutePosition { get; private set; } = "Оператор (подмена)";
     public int StartDay { get; private set; } = 1;
     public int EndDay { get; private set; } = 1;
     public string ReasonCode { get; private set; } = "О";
@@ -25,6 +28,10 @@ public partial class AssignSubstituteDialog : Window
         ApplyButton.Click += OnApplyClicked;
         CancelButton.Click += (_, _) => Close(false);
         ExistingAbsencesComboBox.SelectionChanged += OnExistingAbsenceSelectionChanged;
+        MainEmployeeComboBox.SelectionChanged += OnMainEmployeeSelectionChanged;
+
+        SubstituteNameBox.KeyUp += (_, _) => OnSubstituteNameTyped();
+        SubstituteNameBox.SelectionChanged += (_, _) => OnSubstituteNameTyped();
     }
 
     /// <summary>
@@ -39,59 +46,122 @@ public partial class AssignSubstituteDialog : Window
         int? preselectedEndDay = null,
         string? preselectedReason = null)
     {
-        var empList = employeeNames.ToList();
-        MainEmployeeComboBox.ItemsSource = empList;
-
-        EndDayNumeric.Maximum = maxDaysInMonth;
-        StartDayNumeric.Maximum = maxDaysInMonth;
-
-        // Настройка списка существующих отсутствий
-        _existingAbsences = existingAbsences ?? new List<ExistingAbsencePeriod>();
-        
-        var comboItems = new List<string>();
-        foreach (var p in _existingAbsences)
+        _isUpdatingInternally = true;
+        try
         {
-            comboItems.Add(p.DisplayText);
-        }
-        comboItems.Add("✏️ Указать сотрудника и даты вручную");
+            var empList = employeeNames.ToList();
+            MainEmployeeComboBox.ItemsSource = empList;
 
-        ExistingAbsencesComboBox.ItemsSource = comboItems;
+            EndDayNumeric.Maximum = maxDaysInMonth;
+            StartDayNumeric.Maximum = maxDaysInMonth;
 
-        if (_existingAbsences.Count > 0)
-        {
-            ExistingAbsencesBorder.IsVisible = true;
-            // Ищем период без подмены
-            int firstWithoutSub = _existingAbsences.FindIndex(a => !a.HasSubstitute);
-            ExistingAbsencesComboBox.SelectedIndex = firstWithoutSub >= 0 ? firstWithoutSub : 0;
-        }
-        else
-        {
-            ExistingAbsencesBorder.IsVisible = false;
-            ExistingAbsencesComboBox.SelectedIndex = comboItems.Count - 1;
-        }
+            // Загружаем сохраненных в БД подменных сотрудников
+            _savedSubstitutes = DatabaseService.Instance.GetSubstitutes();
+            var substituteNames = _savedSubstitutes.Select(s => s.FullName).Distinct().ToList();
+            SubstituteNameBox.ItemsSource = substituteNames;
 
-        // Если переданы предзаполненные данные (например, вызов сразу после оформления отпуска)
-        if (!string.IsNullOrWhiteSpace(preselectedEmployee))
-        {
-            MainEmployeeComboBox.SelectedItem = preselectedEmployee;
-            if (preselectedStartDay.HasValue) StartDayNumeric.Value = preselectedStartDay.Value;
-            if (preselectedEndDay.HasValue) EndDayNumeric.Value = preselectedEndDay.Value;
-
-            if (!string.IsNullOrWhiteSpace(preselectedReason))
+            // Настройка списка существующих отсутствий
+            _existingAbsences = existingAbsences ?? new List<ExistingAbsencePeriod>();
+            
+            var comboItems = new List<string>();
+            foreach (var p in _existingAbsences)
             {
-                ReasonComboBox.SelectedIndex = preselectedReason == "Б" ? 1 : 0;
+                comboItems.Add(p.DisplayText);
             }
+            comboItems.Add("✏️ Указать сотрудника и даты вручную");
+
+            ExistingAbsencesComboBox.ItemsSource = comboItems;
+
+            if (_existingAbsences.Count > 0)
+            {
+                ExistingAbsencesBorder.IsVisible = true;
+                // Ищем период без подмены
+                int firstWithoutSub = _existingAbsences.FindIndex(a => !a.HasSubstitute);
+                ExistingAbsencesComboBox.SelectedIndex = firstWithoutSub >= 0 ? firstWithoutSub : 0;
+            }
+            else
+            {
+                ExistingAbsencesBorder.IsVisible = false;
+                ExistingAbsencesComboBox.SelectedIndex = comboItems.Count - 1;
+            }
+
+            // Если переданы предзаполненные данные (например, вызов сразу после оформления отпуска)
+            if (!string.IsNullOrWhiteSpace(preselectedEmployee))
+            {
+                MainEmployeeComboBox.SelectedItem = preselectedEmployee;
+                if (preselectedStartDay.HasValue) StartDayNumeric.Value = preselectedStartDay.Value;
+                if (preselectedEndDay.HasValue) EndDayNumeric.Value = preselectedEndDay.Value;
+
+                if (!string.IsNullOrWhiteSpace(preselectedReason))
+                {
+                    ReasonComboBox.SelectedIndex = preselectedReason == "Б" ? 1 : 0;
+                }
+            }
+            else if (MainEmployeeComboBox.SelectedIndex < 0 && empList.Count > 0)
+            {
+                MainEmployeeComboBox.SelectedIndex = 0;
+                StartDayNumeric.Value = 1;
+                EndDayNumeric.Value = Math.Min(14, maxDaysInMonth);
+            }
+
+            // Проверяем сохраненного подменного для выбранного сотрудника
+            AutoFillSubstituteForCurrentEmployee();
         }
-        else if (MainEmployeeComboBox.SelectedIndex < 0 && empList.Count > 0)
+        finally
         {
-            MainEmployeeComboBox.SelectedIndex = 0;
-            StartDayNumeric.Value = 1;
-            EndDayNumeric.Value = Math.Min(14, maxDaysInMonth);
+            _isUpdatingInternally = false;
+        }
+    }
+
+    private void OnMainEmployeeSelectionChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        if (_isUpdatingInternally) return;
+        AutoFillSubstituteForCurrentEmployee();
+    }
+
+    private void AutoFillSubstituteForCurrentEmployee()
+    {
+        var mainEmp = MainEmployeeComboBox.SelectedItem as string;
+        if (string.IsNullOrWhiteSpace(mainEmp)) return;
+
+        // 1. Ищем подменного, который ранее заменял именно этого сотрудника
+        var previousSub = DatabaseService.Instance.GetSubstituteForEmployee(mainEmp);
+        if (previousSub != null)
+        {
+            SubstituteNameBox.Text = previousSub.FullName;
+            SubstitutePositionTextBox.Text = previousSub.Position;
+            return;
         }
 
-        // Подсказки автодополнения ФИО подменных
-        var recentSubstitutes = DatabaseService.Instance.GetRecentSubstituteNames();
-        SubstituteNameBox.ItemsSource = recentSubstitutes;
+        // 2. Если для этого сотрудника еще не было подменного, берем самого недавнего из базы (если есть)
+        if (string.IsNullOrWhiteSpace(SubstituteNameBox.Text) && _savedSubstitutes.Count > 0)
+        {
+            var latest = _savedSubstitutes[0];
+            SubstituteNameBox.Text = latest.FullName;
+            SubstitutePositionTextBox.Text = latest.Position;
+            return;
+        }
+
+        // 3. Если поле должности пустое, выставляем значение по умолчанию
+        if (string.IsNullOrWhiteSpace(SubstitutePositionTextBox.Text))
+        {
+            SubstitutePositionTextBox.Text = "Оператор (подмена)";
+        }
+    }
+
+    private void OnSubstituteNameTyped()
+    {
+        if (_isUpdatingInternally) return;
+
+        string currentText = SubstituteNameBox.Text?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(currentText)) return;
+
+        // Если введенное имя совпадает с ранее сохраненным подменным — подставляем его сохраненную должность
+        var match = _savedSubstitutes.FirstOrDefault(s => s.FullName.Equals(currentText, StringComparison.OrdinalIgnoreCase));
+        if (match != null && !string.IsNullOrWhiteSpace(match.Position))
+        {
+            SubstitutePositionTextBox.Text = match.Position;
+        }
     }
 
     private void OnExistingAbsenceSelectionChanged(object? sender, SelectionChangedEventArgs e)
@@ -100,14 +170,28 @@ public partial class AssignSubstituteDialog : Window
         if (idx >= 0 && idx < _existingAbsences.Count)
         {
             var period = _existingAbsences[idx];
-            MainEmployeeComboBox.SelectedItem = period.EmployeeName;
-            ReasonComboBox.SelectedIndex = period.AbsenceCode == "Б" ? 1 : 0;
-            StartDayNumeric.Value = period.StartDay;
-            EndDayNumeric.Value = period.EndDay;
-
-            if (!string.IsNullOrWhiteSpace(period.SubstituteAssignedName))
+            _isUpdatingInternally = true;
+            try
             {
-                SubstituteNameBox.Text = period.SubstituteAssignedName;
+                MainEmployeeComboBox.SelectedItem = period.EmployeeName;
+                ReasonComboBox.SelectedIndex = period.AbsenceCode == "Б" ? 1 : 0;
+                StartDayNumeric.Value = period.StartDay;
+                EndDayNumeric.Value = period.EndDay;
+
+                if (!string.IsNullOrWhiteSpace(period.SubstituteAssignedName))
+                {
+                    SubstituteNameBox.Text = period.SubstituteAssignedName;
+                    var match = _savedSubstitutes.FirstOrDefault(s => s.FullName.Equals(period.SubstituteAssignedName, StringComparison.OrdinalIgnoreCase));
+                    SubstitutePositionTextBox.Text = match?.Position ?? "Оператор (подмена)";
+                }
+                else
+                {
+                    AutoFillSubstituteForCurrentEmployee();
+                }
+            }
+            finally
+            {
+                _isUpdatingInternally = false;
             }
 
             ShiftTransferInfoText.Text = $"К замещению: {period.ScheduledShiftsCount} смен ({period.ScheduledHours} ч). Все рабочие часы будут перенесены на подменного!";
@@ -135,6 +219,12 @@ public partial class AssignSubstituteDialog : Window
             return;
         }
 
+        string subPos = SubstitutePositionTextBox.Text?.Trim() ?? "";
+        if (string.IsNullOrWhiteSpace(subPos))
+        {
+            subPos = "Оператор (подмена)";
+        }
+
         int start = (int)(StartDayNumeric.Value ?? 1);
         int end = (int)(EndDayNumeric.Value ?? 1);
 
@@ -151,9 +241,13 @@ public partial class AssignSubstituteDialog : Window
 
         SelectedMainEmployeeName = mainEmp;
         EnteredSubstituteFullName = subName;
+        EnteredSubstitutePosition = subPos;
         StartDay = start;
         EndDay = end;
         ReasonCode = reason;
+
+        // Сохраняем подменного в базу данных с должностью и привязкой к сотруднику
+        DatabaseService.Instance.SaveSubstitute(subName, subPos, mainEmp);
 
         Close(true);
     }

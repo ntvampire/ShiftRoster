@@ -292,9 +292,14 @@ public class RosterCalculationService
             return;
 
         substituteFullName = substituteFullName.Trim();
+        if (string.IsNullOrWhiteSpace(substitutePosition))
+        {
+            substitutePosition = "Оператор (подмена)";
+        }
+        substitutePosition = substitutePosition.Trim();
 
-        // Фиксируем имя подменного в истории для подсказок при следующем вводе
-        DatabaseService.Instance.RecordSubstituteName(substituteFullName);
+        // Сохраняем подменного в базе данных с должностью и привязкой к основному сотруднику
+        DatabaseService.Instance.SaveSubstitute(substituteFullName, substitutePosition, mainEmployeeName);
 
         // Находим сотрудника для планового восстановления смен
         var mainEmp = postEmployees?.FirstOrDefault(e => e.FullName.Equals(mainEmployeeName, StringComparison.OrdinalIgnoreCase));
@@ -332,6 +337,14 @@ public class RosterCalculationService
                 };
                 cells.Add(newSubCell);
                 existingSubCells[d] = newSubCell;
+            }
+        }
+        else
+        {
+            // Обновляем должность для существующих ячеек подменного, если указана
+            foreach (var sc in existingSubCells.Values)
+            {
+                sc.Position = substitutePosition;
             }
         }
 

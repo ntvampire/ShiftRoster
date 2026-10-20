@@ -320,6 +320,48 @@ public static class VerificationTests
         db.DeletePost(testSubPost);
         Console.WriteLine("[УСПЕХ] (Плановые дежурства восстановились и перенеслись на подменного, норма 24ч соблюдена)");
 
+        // 12. Проверка сохранения подменных сотрудников в БД, их должностей и связки с основными работниками
+        Console.Write("12. Сохранение подменных сотрудников, их должностей и автоподстановка... ");
+        string testSubName = "Федоров К.Е.";
+        string testSubPos = "Дежурный техник (подмена)";
+        string testMainEmp = "Иванов С.П.";
+
+        db.SaveSubstitute(testSubName, testSubPos, testMainEmp);
+
+        var loadedSub = db.GetSubstituteForEmployee(testMainEmp);
+        if (loadedSub == null)
+        {
+            throw new Exception($"Подменный сотрудник для «{testMainEmp}» не найден в базе данных!");
+        }
+        if (loadedSub.FullName != testSubName)
+        {
+            throw new Exception($"Ожидалось ФИО подменного «{testSubName}», получено: «{loadedSub.FullName}»");
+        }
+        if (loadedSub.Position != testSubPos)
+        {
+            throw new Exception($"Ожидалась должность «{testSubPos}», получено: «{loadedSub.Position}»");
+        }
+
+        var allSubs = db.GetSubstitutes();
+        if (!allSubs.Any(s => s.FullName == testSubName && s.Position == testSubPos))
+        {
+            throw new Exception($"Подменный «{testSubName}» с должностью «{testSubPos}» не найден в общем списке!");
+        }
+
+        // Проверка переноса должности в ячейки графика
+        var testCells = new List<RosterCell>
+        {
+            new RosterCell { ScheduleId = 999, EmployeeName = testMainEmp, Position = "Оператор", DayOfMonth = 1, ShiftCode = "16", DayHours = 14, NightHours = 2, TotalHours = 16 }
+        };
+        calc.ApplySubstitute(testCells, 999, testMainEmp, testSubName, 1, 1, "О", substitutePosition: testSubPos);
+        var subCellCheck = testCells.FirstOrDefault(c => c.EmployeeName == testSubName);
+        if (subCellCheck == null || subCellCheck.Position != testSubPos)
+        {
+            throw new Exception($"Должность подменного в ячейке графика «{subCellCheck?.Position}» не совпадает с «{testSubPos}»!");
+        }
+
+        Console.WriteLine("[УСПЕХ] (ФИО и должность подменного сохраняются в БД, связка с постоянным работником работает корректно)");
+
         Console.WriteLine("=================================================");
         Console.WriteLine("ВСЕ ТЕСТЫ И ТРЕБОВАНИЯ ТЗ УСПЕШНО ВЫПОЛНЕНЫ!");
         Console.WriteLine("=================================================");

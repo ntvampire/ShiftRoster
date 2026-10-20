@@ -11,9 +11,30 @@ using ShiftRoster.Services;
 
 namespace ShiftRoster.ViewModels;
 
+public class AbsenceAssignedEventArgs : EventArgs
+{
+    public string EmployeeName { get; }
+    public int StartDay { get; }
+    public int EndDay { get; }
+    public string AbsenceCode { get; }
+
+    public AbsenceAssignedEventArgs(string employeeName, int startDay, int endDay, string absenceCode)
+    {
+        EmployeeName = employeeName;
+        StartDay = startDay;
+        EndDay = endDay;
+        AbsenceCode = absenceCode;
+    }
+}
+
 public partial class MainViewModel : ViewModelBase
 {
     private ShiftSchedule? _currentSchedule;
+
+    /// <summary>
+    /// Событие запроса назначения подменного после назначения больничного/отпуска (из палитры или меню)
+    /// </summary>
+    public event Action<AbsenceAssignedEventArgs>? AbsenceAssigned;
 
     [ObservableProperty]
     private int _currentYear = DateTime.Now.Year;
@@ -405,6 +426,19 @@ public partial class MainViewModel : ViewModelBase
         StatusMessage = targets.Count == 1 
             ? $"Смена обновлена: {shiftLabel}" 
             : $"Статус «{shiftLabel}» применен к {targets.Count} ячейкам.";
+
+        // Если назначен отпуск или больничный для сотрудника — инициируем запрос назначения подменного!
+        if (shiftType is "О" or "Б")
+        {
+            var distinctEmployees = targets.Select(c => c.Model.EmployeeName).Distinct().ToList();
+            if (distinctEmployees.Count == 1)
+            {
+                string empName = distinctEmployees[0];
+                int minDay = targets.Min(c => c.DayOfMonth);
+                int maxDay = targets.Max(c => c.DayOfMonth);
+                AbsenceAssigned?.Invoke(new AbsenceAssignedEventArgs(empName, minDay, maxDay, shiftType));
+            }
+        }
     }
 
     /// <summary>
@@ -532,9 +566,15 @@ public partial class MainViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// Назначение подменного сотрудника на даты отпуска/болезни
+    /// Назначение подменного сотрудника на даты отпуска/болезни с указанием должности
     /// </summary>
-    public void AssignSubstitute(string mainEmployeeName, string substituteFullName, int startDay, int endDay, string reasonCode)
+    public void AssignSubstitute(
+        string mainEmployeeName, 
+        string substituteFullName, 
+        string substitutePosition, 
+        int startDay, 
+        int endDay, 
+        string reasonCode)
     {
         if (_currentSchedule == null) return;
 
@@ -555,11 +595,17 @@ public partial class MainViewModel : ViewModelBase
             CurrentYear,
             CurrentMonth,
             baseYear,
-            baseMonth);
+            baseMonth,
+            substitutePosition);
 
         DatabaseService.Instance.SaveRosterCells(_currentSchedule.Id, allCells);
         LoadMonth(CurrentYear, CurrentMonth);
-        StatusMessage = $"Подменный работник «{substituteFullName}» назначен взамен «{mainEmployeeName}». Все смены перенесены!";
+        StatusMessage = $"Подменный работник «{substituteFullName}» ({substitutePosition}) назначен взамен «{mainEmployeeName}». Все смены перенесены!";
+    }
+
+    public void AssignSubstitute(string mainEmployeeName, string substituteFullName, int startDay, int endDay, string reasonCode)
+    {
+        AssignSubstitute(mainEmployeeName, substituteFullName, "Оператор (подмена)", startDay, endDay, reasonCode);
     }
 
     /// <summary>

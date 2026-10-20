@@ -2,7 +2,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="ShiftRoster.Views.AssignSubstituteDialog"
         Title="Назначение подменного работника"
-        Width="580" Height="620" MinHeight="520"
+        Width="580" Height="680" MinHeight="560"
         SizeToContent="Height"
         CanResize="True"
         WindowStartupLocation="CenterOwner"
@@ -72,14 +72,24 @@
                     </StackPanel>
                 </Border>
 
-                <!-- ФИО подменного сотрудника (произвольный ввод!) -->
+                <!-- ФИО подменного сотрудника (выбор из сохраненных или ввод нового) -->
                 <StackPanel Spacing="4">
-                    <TextBlock Text="ФИО подменного работника (впишите произвольно):" Foreground="#CCCCCC" FontSize="13" />
+                    <TextBlock Text="ФИО подменного работника:" Foreground="#CCCCCC" FontSize="13" />
                     <AutoCompleteBox x:Name="SubstituteNameBox" 
-                                     Height="34"
+                                     Height="34" 
                                      Watermark="Например: Смирнов В.А." 
                                      FilterMode="ContainsOrdinal" />
-                    <TextBlock Text="* Подменные сотрудники редко повторяются, поэтому заводить отдельную карточку не нужно."
+                    <TextBlock Text="* Выберите из ранее использованных или введите новое ФИО"
+                               Foreground="#777777" FontSize="11" />
+                </StackPanel>
+
+                <!-- Должность подменного сотрудника -->
+                <StackPanel Spacing="4">
+                    <TextBlock Text="Должность подменного работника:" Foreground="#CCCCCC" FontSize="13" />
+                    <TextBox x:Name="SubstitutePositionTextBox" 
+                             Height="34" 
+                             Watermark="Например: Оператор (подмена)" />
+                    <TextBlock Text="* Должность сохраняется в базе и подставляется при последующих назначениях"
                                Foreground="#777777" FontSize="11" />
                 </StackPanel>
             </StackPanel>
