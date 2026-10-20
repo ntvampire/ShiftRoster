@@ -539,6 +539,9 @@ public partial class MainViewModel : ViewModelBase
         if (_currentSchedule == null) return;
 
         var allCells = Rows.SelectMany(r => r.DayCells.Select(c => c.Model)).ToList();
+        var postEmployees = DatabaseService.Instance.GetEmployees(CurrentPostName);
+        var (baseYear, baseMonth) = DatabaseService.Instance.GetPostBaseMonth(CurrentPostName);
+
         RosterCalculationService.Instance.ApplySubstitute(
             allCells,
             _currentSchedule.Id,
@@ -546,11 +549,126 @@ public partial class MainViewModel : ViewModelBase
             substituteFullName,
             startDay,
             endDay,
-            reasonCode);
+            reasonCode,
+            postEmployees,
+            CurrentPostPattern,
+            CurrentYear,
+            CurrentMonth,
+            baseYear,
+            baseMonth);
 
         DatabaseService.Instance.SaveRosterCells(_currentSchedule.Id, allCells);
         LoadMonth(CurrentYear, CurrentMonth);
-        StatusMessage = $"Подменный работник «{substituteFullName}» назначен взамен «{mainEmployeeName}».";
+        StatusMessage = $"Подменный работник «{substituteFullName}» назначен взамен «{mainEmployeeName}». Все смены перенесены!";
+    }
+
+    /// <summary>
+    /// Поиск всех оформленных периодов отпусков и больничных в текущем месяце
+    /// для предложения при назначении подмены
+    /// </summary>
+    public List<ExistingAbsencePeriod> GetExistingAbsencesInMonth()
+    {
+        var result = new List<ExistingAbsencePeriod>();
+        int daysInMonth = DateTime.DaysInMonth(CurrentYear, CurrentMonth);
+        var postEmployees = DatabaseService.Instance.GetEmployees(CurrentPostName);
+        var (baseYear, baseMonth) = DatabaseService.Instance.GetPostBaseMonth(CurrentPostName);
+
+        // Ищем подменных в текущем графике
+        var substituteMap = new Dictionary<string, string>(); // [mainEmpName] -> subName
+        foreach (var r in Rows.Where(r => r.IsSubstitute))
+        {
+            var firstSubCell = r.DayCells.FirstOrDefault(c => c.Model.TotalHours > 0);
+            if (firstSubCell != null && !string.IsNullOrWhiteSpace(firstSubCell.Model.SubstitutedForName))
+            {
+                substituteMap[firstSubCell.Model.SubstitutedForName] = r.EmployeeName;
+            }
+        }
+
+        foreach (var row in Rows.Where(r => !r.IsSubstitute))
+        {
+            var emp = postEmployees.FirstOrDefault(e => e.FullName == row.EmployeeName);
+            int start = -1;
+            string currentCode = "";
+
+            for (int d = 1; d <= daysInMonth; d++)
+            {
+                var cell = row.DayCells.FirstOrDefault(c => c.DayOfMonth == d);
+                string code = cell?.ShiftCode ?? "";
+
+                if (code is "О" or "Б")
+                {
+                    if (start == -1)
+                    {
+                        start = d;
+                        currentCode = code;
+                    }
+                    else if (code != currentCode)
+                    {
+                        AddPeriod(result, row.EmployeeName, currentCode, start, d - 1, emp, baseYear, baseMonth, substituteMap);
+                        start = d;
+                        currentCode = code;
+                    }
+                }
+                else
+                {
+                    if (start != -1)
+                    {
+                        AddPeriod(result, row.EmployeeName, currentCode, start, d - 1, emp, baseYear, baseMonth, substituteMap);
+                        start = -1;
+                        currentCode = "";
+                    }
+                }
+            }
+
+            if (start != -1)
+            {
+                AddPeriod(result, row.EmployeeName, currentCode, start, daysInMonth, emp, baseYear, baseMonth, substituteMap);
+            }
+        }
+
+        return result;
+    }
+
+    private void AddPeriod(
+        List<ExistingAbsencePeriod> list, 
+        string empName, 
+        string code, 
+        int start, 
+        int end, 
+        Employee? emp, 
+        int baseYear, 
+        int baseMonth, 
+        Dictionary<string, string> subMap)
+    {
+        int scheduledShifts = 0;
+        double scheduledHours = 0;
+
+        if (emp != null)
+        {
+            for (int d = start; d <= end; d++)
+            {
+                var shift = RosterCalculationService.Instance.GetPlannedShiftForDay(
+                    emp, CurrentPostPattern, CurrentYear, CurrentMonth, d, baseYear, baseMonth);
+                if (shift.TotalHours > 0)
+                {
+                    scheduledShifts++;
+                    scheduledHours += shift.TotalHours;
+                }
+            }
+        }
+
+        subMap.TryGetValue(empName, out var subName);
+
+        list.Add(new ExistingAbsencePeriod
+        {
+            EmployeeName = empName,
+            AbsenceCode = code,
+            StartDay = start,
+            EndDay = end,
+            ScheduledShiftsCount = scheduledShifts,
+            ScheduledHours = scheduledHours,
+            SubstituteAssignedName = subName ?? string.Empty
+        });
     }
 
     /// <summary>

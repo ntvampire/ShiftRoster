@@ -220,8 +220,57 @@ public class RosterCalculationService
     }
 
     /// <summary>
+    /// Определение плановой смены сотрудника на конкретную календарную дату
+    /// согласно схеме графика (1/3 или 2/2) и стартовому дню.
+    /// Возвращает код смены, дневные, ночные и общие часы.
+    /// </summary>
+    public (string ShiftCode, double DayHours, double NightHours, double TotalHours) GetPlannedShiftForDay(
+        Employee emp, 
+        string pattern, 
+        int year, 
+        int month, 
+        int day, 
+        int baseYear, 
+        int baseMonth)
+    {
+        int daysInBase = DateTime.DaysInMonth(baseYear, baseMonth);
+        int startDay = Math.Clamp(emp.InitialShiftDay, 1, daysInBase);
+        var baseDate = new DateTime(baseYear, baseMonth, startDay);
+        var targetDate = new DateTime(year, month, day);
+
+        int totalDaysOffset = (targetDate - baseDate).Days;
+        int cycleDay = ((totalDaysOffset % 4) + 4) % 4;
+
+        if (pattern == "2/2")
+        {
+            if (cycleDay is 0 or 1)
+            {
+                if (emp.ShiftPattern.Contains("Ночь", StringComparison.OrdinalIgnoreCase) || emp.SortOrder > 2)
+                {
+                    return ("Н12", 0.0, 12.0, 12.0);
+                }
+                return ("Д12", 12.0, 0.0, 12.0);
+            }
+            return ("В", 0.0, 0.0, 0.0);
+        }
+        else // 1/3 (сутки через трое)
+        {
+            if (cycleDay == 0)
+            {
+                return ("16", 14.0, 2.0, 16.0);
+            }
+            else if (cycleDay == 1)
+            {
+                return ("8", 2.0, 6.0, 8.0);
+            }
+            return ("В", 0.0, 0.0, 0.0);
+        }
+    }
+
+    /// <summary>
     /// Назначение подменного сотрудника на период отпуска или болезни.
     /// Позволяет вписать произвольное ФИО подменного без создания карточки!
+    /// Корректно восстанавливает плановые дежурства, даже если ячейки уже были помечены как 'О' или 'Б'!
     /// </summary>
     public void ApplySubstitute(
         List<RosterCell> cells,
@@ -231,6 +280,12 @@ public class RosterCalculationService
         int startDay,
         int endDay,
         string absenceCode, // "О" (Отпуск) или "Б" (Больничный)
+        List<Employee>? postEmployees = null,
+        string postPattern = "1/3",
+        int year = 0,
+        int month = 0,
+        int baseYear = 0,
+        int baseMonth = 0,
         string substitutePosition = "Оператор (подмена)")
     {
         if (string.IsNullOrWhiteSpace(substituteFullName))
@@ -240,6 +295,9 @@ public class RosterCalculationService
 
         // Фиксируем имя подменного в истории для подсказок при следующем вводе
         DatabaseService.Instance.RecordSubstituteName(substituteFullName);
+
+        // Находим сотрудника для планового восстановления смен
+        var mainEmp = postEmployees?.FirstOrDefault(e => e.FullName.Equals(mainEmployeeName, StringComparison.OrdinalIgnoreCase));
 
         // Находим все ячейки основного сотрудника за указанный период
         var targetCells = cells
@@ -279,11 +337,24 @@ public class RosterCalculationService
 
         foreach (var mainCell in targetCells)
         {
-            // Сохраняем часы, которые должен был отработать основной сотрудник
+            // Определяем часы, которые должен был отработать основной сотрудник
             double dutyDayHours = mainCell.DayHours;
             double dutyNightHours = mainCell.NightHours;
             double dutyTotalHours = mainCell.TotalHours;
-            string originalShiftCode = mainCell.ShiftCode;
+            string transferShiftCode = mainCell.ShiftCode;
+
+            // Если у основного сотрудника уже стоял отпуск/больничный или 0ч,
+            // восстанавливаем его плановое дежурство по схеме подразделения!
+            if (dutyTotalHours <= 0 && mainEmp != null && year > 0 && month > 0)
+            {
+                int bYear = baseYear > 0 ? baseYear : year;
+                int bMonth = baseMonth > 0 ? baseMonth : month;
+                var planned = GetPlannedShiftForDay(mainEmp, postPattern, year, month, mainCell.DayOfMonth, bYear, bMonth);
+                dutyDayHours = planned.DayHours;
+                dutyNightHours = planned.NightHours;
+                dutyTotalHours = planned.TotalHours;
+                transferShiftCode = planned.ShiftCode;
+            }
 
             // Основному сотруднику ставим статус отсутствия (О или Б) и обнуляем рабочие часы
             mainCell.ShiftCode = absenceCode;
@@ -292,12 +363,12 @@ public class RosterCalculationService
             mainCell.TotalHours = 0;
             mainCell.Notes = $"Замещен: {substituteFullName}";
 
-            // Если в этот день у основного сотрудника была рабочая смена — передаем ее подменному!
+            // Если в этот день была рабочая смена — передаем ее подменному!
             if (dutyTotalHours > 0)
             {
                 if (existingSubCells.TryGetValue(mainCell.DayOfMonth, out var subCell))
                 {
-                    subCell.ShiftCode = originalShiftCode;
+                    subCell.ShiftCode = transferShiftCode;
                     subCell.DayHours = dutyDayHours;
                     subCell.NightHours = dutyNightHours;
                     subCell.TotalHours = dutyTotalHours;

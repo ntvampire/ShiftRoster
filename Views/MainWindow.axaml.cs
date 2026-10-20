@@ -191,6 +191,32 @@ public partial class MainWindow : Window
                 dialog.SelectedStatusTag,
                 dialog.StartDay,
                 dialog.EndDay);
+
+            // Если назначен отпуск или больничный — сразу открываем окно назначения подменного с возможностью закрыть/пропустить!
+            if (dialog.SelectedStatusTag is "О" or "Б")
+            {
+                var existing = vm.GetExistingAbsencesInMonth();
+                var subDialog = new AssignSubstituteDialog();
+                subDialog.Initialize(
+                    employeeNames,
+                    maxDays,
+                    existing,
+                    dialog.SelectedEmployee,
+                    dialog.StartDay,
+                    dialog.EndDay,
+                    dialog.SelectedStatusTag);
+
+                bool subResult = await subDialog.ShowDialog<bool>(this);
+                if (subResult && !string.IsNullOrWhiteSpace(subDialog.EnteredSubstituteFullName))
+                {
+                    vm.AssignSubstitute(
+                        subDialog.SelectedMainEmployeeName,
+                        subDialog.EnteredSubstituteFullName,
+                        subDialog.StartDay,
+                        subDialog.EndDay,
+                        subDialog.ReasonCode);
+                }
+            }
         }
     }
 
@@ -211,11 +237,13 @@ public partial class MainWindow : Window
         }
 
         int maxDays = DateTime.DaysInMonth(vm.CurrentYear, vm.CurrentMonth);
+        var existing = vm.GetExistingAbsencesInMonth();
+
         var dialog = new AssignSubstituteDialog();
-        dialog.Initialize(employeeNames, maxDays);
+        dialog.Initialize(employeeNames, maxDays, existing);
 
         bool result = await dialog.ShowDialog<bool>(this);
-        if (result)
+        if (result && !string.IsNullOrWhiteSpace(dialog.EnteredSubstituteFullName))
         {
             vm.AssignSubstitute(
                 dialog.SelectedMainEmployeeName,

@@ -259,6 +259,67 @@ public static class VerificationTests
         db.DeletePost(contPost);
         Console.WriteLine("[УСПЕХ] (Смена бесшовно переходит между месяцами: 31 окт [16ч/8ч] -> 1 ноя [8ч/16ч], норма 24ч)");
 
+        // 11. Проверка назначения подменного на уже оформленный отпуск/больничный
+        Console.Write("11. Подмена на уже оформленный отпуск (восстановление плановых смен)... ");
+        string testSubPost = "Пост Тест Подмены";
+        var te1 = new Employee { FullName = "Оператор 1", Position = "Оператор", PostName = testSubPost, InitialShiftDay = 1, SortOrder = 1 };
+        var te2 = new Employee { FullName = "Оператор 2", Position = "Оператор", PostName = testSubPost, InitialShiftDay = 2, SortOrder = 2 };
+        var te3 = new Employee { FullName = "Оператор 3", Position = "Оператор", PostName = testSubPost, InitialShiftDay = 3, SortOrder = 3 };
+        var te4 = new Employee { FullName = "Оператор 4", Position = "Оператор", PostName = testSubPost, InitialShiftDay = 4, SortOrder = 4 };
+        db.SaveEmployee(te1);
+        db.SaveEmployee(te2);
+        db.SaveEmployee(te3);
+        db.SaveEmployee(te4);
+        var subEmps = db.GetEmployees(testSubPost);
+
+        db.SetPostBaseMonth(testSubPost, 2026, 10);
+        var subSched = db.GetOrCreateSchedule(2026, 10, testSubPost, "1/3");
+        var subCells = calc.AutoFillOneThree(subSched.Id, subEmps, 2026, 10, 2026, 10);
+
+        // Сначала Оператор 1 уходит в отпуск с 1 по 14 число (ячейки обнуляются)
+        for (int d = 1; d <= 14; d++)
+        {
+            var c = subCells.First(cell => cell.EmployeeName == "Оператор 1" && cell.DayOfMonth == d);
+            c.ShiftCode = "О";
+            c.DayHours = 0;
+            c.NightHours = 0;
+            c.TotalHours = 0;
+        }
+
+        // Теперь назначаем подменного сотрудника "Ковалев А.С." на уже оформленный отпуск!
+        calc.ApplySubstitute(
+            subCells, 
+            subSched.Id, 
+            "Оператор 1", 
+            "Ковалев А.С.", 
+            1, 
+            14, 
+            "О", 
+            subEmps, 
+            "1/3", 
+            2026, 
+            10, 
+            2026, 
+            10);
+
+        // Проверяем: Ковалев А.С. должен был получить смены 1 числа (16ч), 5 числа (16ч), 6 числа (8ч) и т.д.!
+        var kovalevDay1 = subCells.First(c => c.EmployeeName == "Ковалев А.С." && c.DayOfMonth == 1);
+        if (kovalevDay1.TotalHours != 16.0)
+        {
+            throw new Exception($"Ковалев А.С. не получил смену 16ч 1 октября! У него {kovalevDay1.TotalHours}ч");
+        }
+
+        // Проверяем суточный баланс 24ч для всех дней отпуска с 1 по 14 число
+        var val14 = calc.ValidatePostDailyBalance(subCells, 14);
+        if (val14.Any(v => !v.IsValid))
+        {
+            var err = val14.First(v => !v.IsValid);
+            throw new Exception($"Баланс 24ч нарушен после подмены на оформленный отпуск: {err.Message}");
+        }
+
+        db.DeletePost(testSubPost);
+        Console.WriteLine("[УСПЕХ] (Плановые дежурства восстановились и перенеслись на подменного, норма 24ч соблюдена)");
+
         Console.WriteLine("=================================================");
         Console.WriteLine("ВСЕ ТЕСТЫ И ТРЕБОВАНИЯ ТЗ УСПЕШНО ВЫПОЛНЕНЫ!");
         Console.WriteLine("=================================================");
