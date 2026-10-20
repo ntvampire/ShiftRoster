@@ -16,6 +16,31 @@ public partial class MainWindow : Window
 
         AssignSubstituteButton.Click += OnAssignSubstituteClicked;
         ExportExcelButton.Click += OnExportExcelClicked;
+        ExportConsolidatedButton.Click += OnExportConsolidatedClicked;
+        ManageEmployeesButton.Click += OnManageEmployeesClicked;
+        ExportCurrentMenuItem.Click += OnExportExcelClicked;
+        ExportAllMenuItem.Click += OnExportConsolidatedClicked;
+    }
+
+    private async void OnManageEmployeesClicked(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainViewModel vm) return;
+
+        var dialog = new ManageEmployeesDialog();
+        dialog.Initialize(vm.SelectedPost);
+
+        bool result = await dialog.ShowDialog<bool>(this);
+        if (result)
+        {
+            // Обновляем список смен и перезагружаем график
+            vm.RefreshPosts();
+            if (vm.AvailablePosts.Contains(dialog.CurrentSelectedPost))
+            {
+                vm.SelectedPost = dialog.CurrentSelectedPost;
+            }
+            vm.LoadMonth(vm.CurrentYear, vm.CurrentMonth);
+            vm.StatusMessage = "Данные сотрудников обновлены, график пересчитан.";
+        }
     }
 
     private async void OnAssignSubstituteClicked(object? sender, RoutedEventArgs e)
@@ -57,35 +82,53 @@ public partial class MainWindow : Window
         try
         {
             string exportedPath = vm.ExportToExcel();
-            if (File.Exists(exportedPath))
-            {
-                // Открываем созданный Excel-файл системным приложением
-                try
-                {
-                    Process.Start(new ProcessStartInfo
-                    {
-                        FileName = exportedPath,
-                        UseShellExecute = true
-                    });
-                }
-                catch
-                {
-                    // Если Excel не сопоставлен, открываем папку
-                    string? dir = Path.GetDirectoryName(exportedPath);
-                    if (!string.IsNullOrEmpty(dir))
-                    {
-                        Process.Start(new ProcessStartInfo
-                        {
-                            FileName = dir,
-                            UseShellExecute = true
-                        });
-                    }
-                }
-            }
+            OpenFileOrFolder(exportedPath);
         }
         catch (Exception ex)
         {
             vm.StatusMessage = $"Ошибка экспорта: {ex.Message}";
+        }
+    }
+
+    private void OnExportConsolidatedClicked(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainViewModel vm) return;
+
+        try
+        {
+            string exportedPath = vm.ExportConsolidatedExcel();
+            OpenFileOrFolder(exportedPath);
+        }
+        catch (Exception ex)
+        {
+            vm.StatusMessage = $"Ошибка формирования общего сводного отчета: {ex.Message}";
+        }
+    }
+
+    private static void OpenFileOrFolder(string path)
+    {
+        if (File.Exists(path))
+        {
+            try
+            {
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = path,
+                    UseShellExecute = true
+                });
+            }
+            catch
+            {
+                string? dir = Path.GetDirectoryName(path);
+                if (!string.IsNullOrEmpty(dir) && Directory.Exists(dir))
+                {
+                    Process.Start(new ProcessStartInfo
+                    {
+                        FileName = dir,
+                        UseShellExecute = true
+                    });
+                }
+            }
         }
     }
 }

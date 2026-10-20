@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using ShiftRoster.Models;
@@ -23,7 +24,6 @@ public static class VerificationTests
             throw new Exception($"Файл БД не найден: {dbPath}");
         }
 
-        // Вызовем бэкап несколько раз, чтобы проверить ротацию до 3 копий
         db.PerformStartupBackup();
         db.PerformStartupBackup();
         db.PerformStartupBackup();
@@ -36,19 +36,32 @@ public static class VerificationTests
         }
         Console.WriteLine($"[УСПЕХ] (БД: {Path.GetFileName(dbPath)}, Бэкапов: {backups.Count})");
 
-        // 2. Проверка сотрудников
-        Console.Write("2. Справочник сотрудников... ");
-        var employees = db.GetEmployees("Пост №1");
+        // 2. Проверка сотрудников и стартовых дней смен
+        Console.Write("2. Справочник сотрудников и стартовые дни смен... ");
+        var posts = db.GetAllPostNames();
+        if (posts.Count == 0)
+        {
+            throw new Exception("Не найдено доступных смен/постов!");
+        }
+
+        string firstPost = posts[0];
+        var employees = db.GetEmployees(firstPost);
         if (employees.Count < 4)
         {
-            throw new Exception($"Ожидалось не менее 4 сотрудников, найдено: {employees.Count}");
+            throw new Exception($"Ожидалось не менее 4 сотрудников для {firstPost}, найдено: {employees.Count}");
         }
-        Console.WriteLine($"[УСПЕХ] ({employees.Count} постоянных сотрудников загружено)");
+
+        // Проверяем, что стартовые дни смен корректно настроены
+        bool hasStartDays = employees.Any(e => e.InitialShiftDay > 0);
+        if (!hasStartDays)
+        {
+            throw new Exception("У сотрудников не задан стартовый день смены!");
+        }
+        Console.WriteLine($"[УСПЕХ] ({employees.Count} сотрудников, смены настроены)");
 
         // 3. Проверка производственного календаря РФ
         Console.Write("3. Производственный календарь РФ (праздники)... ");
         var calendar = ProductionCalendarService.Instance;
-        // Проверяем 9 мая и 1 января 2026 года
         if (!calendar.IsHoliday(2026, 5, 9) || !calendar.IsHoliday(2026, 1, 1))
         {
             throw new Exception("9 мая или 1 января не распознаны как официальные праздники РФ!");
@@ -59,14 +72,14 @@ public static class VerificationTests
         }
         Console.WriteLine("[УСПЕХ] (Праздники РФ определяются корректно)");
 
-        // 4. Проверка автозаполнения графиков и строгого контроля 24ч
-        Console.Write("4. Автозаполнение «Сутки/трое» и контроль ровно 24ч на пост... ");
+        // 4. Проверка автозаполнения с учетом стартового дня и строгого контроля 24ч
+        Console.Write("4. Автозаполнение со стартовыми днями и контроль 24ч на пост... ");
         var calc = RosterCalculationService.Instance;
         int testYear = 2026;
         int testMonth = 10;
         int daysInMonth = DateTime.DaysInMonth(testYear, testMonth);
 
-        var schedule = db.GetOrCreateSchedule(testYear, testMonth, "Пост №1", "1/3");
+        var schedule = db.GetOrCreateSchedule(testYear, testMonth, firstPost, "1/3");
         var cells = calc.AutoFillOneThree(schedule.Id, employees, testYear, testMonth);
 
         var validation = calc.ValidatePostDailyBalance(cells, daysInMonth);
@@ -82,10 +95,8 @@ public static class VerificationTests
         string mainEmp = employees[0].FullName;
         string subEmp = "Смирнов Василий Анатольевич"; // Произвольное ФИО
 
-        // Отправляем первого сотрудника в отпуск с 1 по 10 число
         calc.ApplySubstitute(cells, schedule.Id, mainEmp, subEmp, 1, 10, "О");
 
-        // Проверяем, что баланс 24ч по-прежнему соблюдается на 100%!
         var subValidation = calc.ValidatePostDailyBalance(cells, daysInMonth);
         if (subValidation.Any(v => !v.IsValid))
         {
@@ -93,7 +104,6 @@ public static class VerificationTests
             throw new Exception($"Баланс 24ч нарушился после назначения подмены: {invalid.Message}");
         }
 
-        // Проверяем, что подменный сотрудник появился в ячейках
         bool subFound = cells.Any(c => c.EmployeeName == subEmp && c.TotalHours > 0);
         if (!subFound)
         {
@@ -101,26 +111,35 @@ public static class VerificationTests
         }
         Console.WriteLine($"[УСПЕХ] (Подмена «{subEmp}» назначена, баланс 24ч сохранен)");
 
-        // 6. Проверка итоговых расчетов и экспорта в Excel
-        Console.Write("6. Экспорт в Excel (Бланк Т-13 и Сводка для 1С)... ");
-        var summaries = calc.CalculateSummaries(testYear, testMonth, cells);
-        string exportDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Exports");
+        // 6. Проверка нескольких смен и общего сводного отчета в Excel
+        Console.Write("6. Учет нескольких смен и общий отчет Excel... ");
+        var exportDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Exports");
         if (!Directory.Exists(exportDir)) Directory.CreateDirectory(exportDir);
-        string excelFile = Path.Combine(exportDir, "Test_График_Смен_1С.xlsx");
 
-        ExcelExportService.Instance.ExportRosterToExcel(excelFile, schedule, cells, summaries);
-
-        if (!File.Exists(excelFile))
+        var postDataList = new List<(ShiftSchedule Schedule, List<RosterCell> Cells, List<EmployeeMonthSummary> Summaries)>();
+        foreach (var pName in posts)
         {
-            throw new Exception($"Excel-файл не создался: {excelFile}");
+            var pSched = db.GetOrCreateSchedule(testYear, testMonth, pName, "1/3");
+            var pEmps = db.GetEmployees(pName);
+            var pCells = calc.AutoFillOneThree(pSched.Id, pEmps, testYear, testMonth);
+            var pSums = calc.CalculateSummaries(testYear, testMonth, pCells);
+            postDataList.Add((pSched, pCells, pSums));
         }
 
-        var fi = new FileInfo(excelFile);
-        if (fi.Length < 5000)
+        string consolidatedExcel = Path.Combine(exportDir, "Test_Сводный_График_Все_Смены.xlsx");
+        ExcelExportService.Instance.ExportConsolidatedRosterToExcel(consolidatedExcel, testYear, testMonth, postDataList);
+
+        if (!File.Exists(consolidatedExcel))
         {
-            throw new Exception($"Размер файла слишком мал ({fi.Length} байт), возможно файл поврежден");
+            throw new Exception($"Файл сводного отчета не найден: {consolidatedExcel}");
         }
-        Console.WriteLine($"[УСПЕХ] (Файл сформирован: {fi.Length} байт)");
+
+        var fiConsolidated = new FileInfo(consolidatedExcel);
+        if (fiConsolidated.Length < 10000)
+        {
+            throw new Exception($"Размер сводного файла мал: {fiConsolidated.Length} байт");
+        }
+        Console.WriteLine($"[УСПЕХ] (Сводный отчет по {posts.Count} сменам сформирован: {fiConsolidated.Length} байт)");
 
         Console.WriteLine("=================================================");
         Console.WriteLine("ВСЕ ТЕСТЫ И ТРЕБОВАНИЯ ТЗ УСПЕШНО ВЫПОЛНЕНЫ!");

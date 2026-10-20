@@ -25,7 +25,10 @@ public partial class MainViewModel : ViewModelBase
     private string _currentMonthName = string.Empty;
 
     [ObservableProperty]
-    private string _currentPostName = "Пост №1 (Круглосуточный)";
+    private string _currentPostName = "Смена №1 (Пост 1)";
+
+    [ObservableProperty]
+    private string _selectedPost = "Смена №1 (Пост 1)";
 
     [ObservableProperty]
     private string _windowTitle = "График смен";
@@ -42,13 +45,39 @@ public partial class MainViewModel : ViewModelBase
     [ObservableProperty]
     private RosterCellViewModel? _selectedCell;
 
+    public ObservableCollection<string> AvailablePosts { get; } = new();
     public ObservableCollection<EmployeeRosterRowViewModel> Rows { get; } = new();
     public ObservableCollection<DayColumnHeaderViewModel> DayHeaders { get; } = new();
     public ObservableCollection<DayBalanceViewModel> DayBalances { get; } = new();
 
     public MainViewModel()
     {
+        RefreshPosts();
+        if (AvailablePosts.Count > 0)
+        {
+            _selectedPost = AvailablePosts[0];
+            _currentPostName = _selectedPost;
+        }
         LoadMonth(CurrentYear, CurrentMonth);
+    }
+
+    public void RefreshPosts()
+    {
+        AvailablePosts.Clear();
+        var posts = DatabaseService.Instance.GetAllPostNames();
+        foreach (var p in posts)
+        {
+            AvailablePosts.Add(p);
+        }
+    }
+
+    partial void OnSelectedPostChanged(string value)
+    {
+        if (!string.IsNullOrWhiteSpace(value) && value != CurrentPostName)
+        {
+            CurrentPostName = value;
+            LoadMonth(CurrentYear, CurrentMonth);
+        }
     }
 
     public void LoadMonth(int year, int month)
@@ -325,6 +354,48 @@ public partial class MainViewModel : ViewModelBase
 
         ExcelExportService.Instance.ExportRosterToExcel(targetFilePath, _currentSchedule, allCells, summaries);
         StatusMessage = $"Табель успешно экспортирован в Excel: {Path.GetFileName(targetFilePath)}";
+        return targetFilePath;
+    }
+
+    /// <summary>
+    /// Экспорт общего консолидированного отчета по всем сменам сразу в один файл Excel
+    /// </summary>
+    public string ExportConsolidatedExcel(string? targetFilePath = null)
+    {
+        var postDataList = new List<(ShiftSchedule Schedule, List<RosterCell> Cells, List<EmployeeMonthSummary> Summaries)>();
+        var allPosts = DatabaseService.Instance.GetAllPostNames();
+
+        foreach (var post in allPosts)
+        {
+            var schedule = DatabaseService.Instance.GetOrCreateSchedule(CurrentYear, CurrentMonth, post, "1/3");
+            var cells = DatabaseService.Instance.GetRosterCells(schedule.Id);
+            if (cells.Count == 0)
+            {
+                var employees = DatabaseService.Instance.GetEmployees(post);
+                if (employees.Count > 0)
+                {
+                    cells = RosterCalculationService.Instance.AutoFillOneThree(schedule.Id, employees, CurrentYear, CurrentMonth);
+                    DatabaseService.Instance.SaveRosterCells(schedule.Id, cells);
+                }
+            }
+
+            var summaries = RosterCalculationService.Instance.CalculateSummaries(CurrentYear, CurrentMonth, cells);
+            postDataList.Add((schedule, cells, summaries));
+        }
+
+        if (string.IsNullOrWhiteSpace(targetFilePath))
+        {
+            string baseDir = AppDomain.CurrentDomain.BaseDirectory;
+            string exportDir = Path.Combine(baseDir, "Exports");
+            if (!Directory.Exists(exportDir))
+            {
+                Directory.CreateDirectory(exportDir);
+            }
+            targetFilePath = Path.Combine(exportDir, $"Сводный_График_Смен_Все_Смены_{CurrentMonthName}_{CurrentYear}.xlsx");
+        }
+
+        ExcelExportService.Instance.ExportConsolidatedRosterToExcel(targetFilePath, CurrentYear, CurrentMonth, postDataList);
+        StatusMessage = $"Сводный отчет по всем {allPosts.Count} сменам экспортирован: {Path.GetFileName(targetFilePath)}";
         return targetFilePath;
     }
 

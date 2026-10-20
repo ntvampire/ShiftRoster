@@ -109,7 +109,9 @@ public class DatabaseService
                 PostName TEXT NOT NULL,
                 IsPermanent INTEGER NOT NULL DEFAULT 1,
                 IsActive INTEGER NOT NULL DEFAULT 1,
-                Notes TEXT
+                Notes TEXT,
+                InitialShiftDay INTEGER NOT NULL DEFAULT 1,
+                ShiftPattern TEXT NOT NULL DEFAULT '1/3'
             );
 
             CREATE TABLE IF NOT EXISTS ShiftSchedules (
@@ -157,6 +159,23 @@ public class DatabaseService
         ";
         command.ExecuteNonQuery();
 
+        // Миграция существующих таблиц (если БД уже была создана ранее)
+        try
+        {
+            using var alterCmd1 = connection.CreateCommand();
+            alterCmd1.CommandText = "ALTER TABLE Employees ADD COLUMN InitialShiftDay INTEGER NOT NULL DEFAULT 1";
+            alterCmd1.ExecuteNonQuery();
+        }
+        catch { }
+
+        try
+        {
+            using var alterCmd2 = connection.CreateCommand();
+            alterCmd2.CommandText = "ALTER TABLE Employees ADD COLUMN ShiftPattern TEXT NOT NULL DEFAULT '1/3'";
+            alterCmd2.ExecuteNonQuery();
+        }
+        catch { }
+
         // Проверяем, есть ли сотрудники. Если нет — создаем начальный штат для демонстрации
         command.CommandText = "SELECT COUNT(*) FROM Employees";
         long empCount = (long)(command.ExecuteScalar() ?? 0);
@@ -170,21 +189,27 @@ public class DatabaseService
     {
         var defaults = new[]
         {
-            ("Иванов Сергей Петрович", "Старший смены", "Пост №1"),
-            ("Петров Алексей Владимирович", "Дежурный оператор", "Пост №1"),
-            ("Сидоров Михаил Николаевич", "Дежурный оператор", "Пост №1"),
-            ("Кузнецов Дмитрий Александрович", "Дежурный оператор", "Пост №1")
+            ("Иванов Сергей Петрович", "Старший смены", "Смена №1 (Пост 1)", 1, "1/3"),
+            ("Петров Алексей Владимирович", "Дежурный оператор", "Смена №1 (Пост 1)", 2, "1/3"),
+            ("Сидоров Михаил Николаевич", "Дежурный оператор", "Смена №1 (Пост 1)", 3, "1/3"),
+            ("Кузнецов Дмитрий Александрович", "Дежурный оператор", "Смена №1 (Пост 1)", 4, "1/3"),
+            ("Васильев Роман Игоревич", "Старший смены", "Смена №2 (Пост 2)", 1, "1/3"),
+            ("Николаев Виктор Сергеевич", "Дежурный оператор", "Смена №2 (Пост 2)", 2, "1/3"),
+            ("Федоров Андрей Павлович", "Дежурный оператор", "Смена №2 (Пост 2)", 3, "1/3"),
+            ("Морозов Константин Юрьевич", "Дежурный оператор", "Смена №2 (Пост 2)", 4, "1/3")
         };
 
-        foreach (var (name, pos, post) in defaults)
+        foreach (var (name, pos, post, startDay, pattern) in defaults)
         {
             using var cmd = connection.CreateCommand();
             cmd.CommandText = @"
-                INSERT INTO Employees (FullName, Position, PostName, IsPermanent, IsActive)
-                VALUES (@name, @pos, @post, 1, 1)";
+                INSERT INTO Employees (FullName, Position, PostName, IsPermanent, IsActive, InitialShiftDay, ShiftPattern)
+                VALUES (@name, @pos, @post, 1, 1, @startDay, @pattern)";
             cmd.Parameters.AddWithValue("@name", name);
             cmd.Parameters.AddWithValue("@pos", pos);
             cmd.Parameters.AddWithValue("@post", post);
+            cmd.Parameters.AddWithValue("@startDay", startDay);
+            cmd.Parameters.AddWithValue("@pattern", pattern);
             cmd.ExecuteNonQuery();
         }
     }
@@ -199,11 +224,11 @@ public class DatabaseService
         using var cmd = conn.CreateCommand();
         if (string.IsNullOrWhiteSpace(postName))
         {
-            cmd.CommandText = "SELECT Id, FullName, Position, PostName, IsPermanent, IsActive, Notes FROM Employees WHERE IsActive = 1 ORDER BY FullName";
+            cmd.CommandText = "SELECT Id, FullName, Position, PostName, IsPermanent, IsActive, Notes, InitialShiftDay, ShiftPattern FROM Employees WHERE IsActive = 1 ORDER BY FullName";
         }
         else
         {
-            cmd.CommandText = "SELECT Id, FullName, Position, PostName, IsPermanent, IsActive, Notes FROM Employees WHERE IsActive = 1 AND PostName = @post ORDER BY FullName";
+            cmd.CommandText = "SELECT Id, FullName, Position, PostName, IsPermanent, IsActive, Notes, InitialShiftDay, ShiftPattern FROM Employees WHERE IsActive = 1 AND PostName = @post ORDER BY InitialShiftDay, FullName";
             cmd.Parameters.AddWithValue("@post", postName);
         }
 
@@ -218,7 +243,9 @@ public class DatabaseService
                 PostName = reader.GetString(3),
                 IsPermanent = reader.GetInt32(4) == 1,
                 IsActive = reader.GetInt32(5) == 1,
-                Notes = reader.IsDBNull(6) ? null : reader.GetString(6)
+                Notes = reader.IsDBNull(6) ? null : reader.GetString(6),
+                InitialShiftDay = reader.IsDBNull(7) ? 1 : reader.GetInt32(7),
+                ShiftPattern = reader.IsDBNull(8) ? "1/3" : reader.GetString(8)
             });
         }
         return result;
@@ -233,15 +260,16 @@ public class DatabaseService
         if (emp.Id == 0)
         {
             cmd.CommandText = @"
-                INSERT INTO Employees (FullName, Position, PostName, IsPermanent, IsActive, Notes)
-                VALUES (@name, @pos, @post, @perm, @act, @notes);
+                INSERT INTO Employees (FullName, Position, PostName, IsPermanent, IsActive, Notes, InitialShiftDay, ShiftPattern)
+                VALUES (@name, @pos, @post, @perm, @act, @notes, @startDay, @pattern);
                 SELECT last_insert_rowid();";
         }
         else
         {
             cmd.CommandText = @"
                 UPDATE Employees SET FullName = @name, Position = @pos, PostName = @post, 
-                IsPermanent = @perm, IsActive = @act, Notes = @notes WHERE Id = @id";
+                IsPermanent = @perm, IsActive = @act, Notes = @notes,
+                InitialShiftDay = @startDay, ShiftPattern = @pattern WHERE Id = @id";
             cmd.Parameters.AddWithValue("@id", emp.Id);
         }
 
@@ -251,6 +279,8 @@ public class DatabaseService
         cmd.Parameters.AddWithValue("@perm", emp.IsPermanent ? 1 : 0);
         cmd.Parameters.AddWithValue("@act", emp.IsActive ? 1 : 0);
         cmd.Parameters.AddWithValue("@notes", (object?)emp.Notes ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("@startDay", emp.InitialShiftDay);
+        cmd.Parameters.AddWithValue("@pattern", emp.ShiftPattern);
 
         if (emp.Id == 0)
         {
@@ -260,6 +290,69 @@ public class DatabaseService
         {
             cmd.ExecuteNonQuery();
         }
+    }
+
+    public List<string> GetAllPostNames()
+    {
+        var posts = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        using var conn = new SqliteConnection(_connectionString);
+        conn.Open();
+
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = @"
+            SELECT DISTINCT PostName FROM Employees WHERE IsActive = 1
+            UNION
+            SELECT DISTINCT PostName FROM ShiftSchedules";
+
+        using var reader = cmd.ExecuteReader();
+        while (reader.Read())
+        {
+            if (!reader.IsDBNull(0))
+            {
+                var post = reader.GetString(0);
+                if (!string.IsNullOrWhiteSpace(post))
+                {
+                    posts.Add(post.Trim());
+                }
+            }
+        }
+
+        if (posts.Count == 0)
+        {
+            posts.Add("Смена №1 (Пост 1)");
+            posts.Add("Смена №2 (Пост 2)");
+        }
+
+        return posts.OrderBy(p => p).ToList();
+    }
+
+    public List<ShiftSchedule> GetAllSchedulesForMonth(int year, int month)
+    {
+        var result = new List<ShiftSchedule>();
+        using var conn = new SqliteConnection(_connectionString);
+        conn.Open();
+
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = "SELECT Id, Year, Month, Name, PostName, PatternType, CreatedAt FROM ShiftSchedules WHERE Year = @y AND Month = @m ORDER BY PostName";
+        cmd.Parameters.AddWithValue("@y", year);
+        cmd.Parameters.AddWithValue("@m", month);
+
+        using var reader = cmd.ExecuteReader();
+        while (reader.Read())
+        {
+            result.Add(new ShiftSchedule
+            {
+                Id = reader.GetInt32(0),
+                Year = reader.GetInt32(1),
+                Month = reader.GetInt32(2),
+                Name = reader.GetString(3),
+                PostName = reader.GetString(4),
+                PatternType = reader.GetString(5),
+                CreatedAt = DateTime.Parse(reader.GetString(6))
+            });
+        }
+
+        return result;
     }
 
     public void DeleteEmployee(int id)

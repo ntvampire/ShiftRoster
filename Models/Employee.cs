@@ -14,5 +14,17 @@ public class Employee
     public bool IsActive { get; set; } = true;
     public string? Notes { get; set; }
 
-    public string DisplayTitle => $"{FullName} ({Position})";
+    /// <summary>
+    /// День первой смены в месяце (1..31).
+    /// Например: для схемы "сутки через трое" работник №1 начинает 1-го числа, 
+    /// работник №2 — 2-го числа, работник №3 — 3-го числа, работник №4 — 4-го числа.
+    /// </summary>
+    public int InitialShiftDay { get; set; } = 1;
+
+    /// <summary>
+    /// Тип графика для сотрудника ("1/3", "2/2-День", "2/2-Ночь")
+    /// </summary>
+    public string ShiftPattern { get; set; } = "1/3";
+
+    public string DisplayTitle => $"{FullName} ({Position}) — старт {InitialShiftDay}-го числа";
 }

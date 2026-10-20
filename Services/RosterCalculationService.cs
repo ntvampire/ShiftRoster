@@ -63,7 +63,7 @@ public class RosterCalculationService
     }
 
     /// <summary>
-    /// Автозаполнение сетки для схемы «Сутки через трое (1/3)»
+    /// Автозаполнение сетки для схемы «Сутки через трое (1/3)» с учетом стартового дня каждого сотрудника
     /// Смена 24 часа (16 ч день + 8 ч ночь), затем 3 дня выходных.
     /// Итого в любой день месяца дежурит ровно 1 сотрудник = строго 24 часа на пост!
     /// </summary>
@@ -73,17 +73,15 @@ public class RosterCalculationService
         if (employees.Count == 0) return cells;
 
         int daysInMonth = DateTime.DaysInMonth(year, month);
-        int empCount = employees.Count;
+        bool hasCustomStartDays = employees.Select(e => e.InitialShiftDay).Distinct().Count() == employees.Count;
 
         for (int day = 1; day <= daysInMonth; day++)
         {
-            // Определяем, чей сегодня черед дежурить (цикл из empCount сотрудников, обычно 4)
-            int activeIndex = (startShiftEmployeeIndex + (day - 1)) % empCount;
-
-            for (int i = 0; i < empCount; i++)
+            for (int i = 0; i < employees.Count; i++)
             {
                 var emp = employees[i];
-                bool isDutyDay = (i == activeIndex);
+                int startDay = hasCustomStartDays ? emp.InitialShiftDay : (startShiftEmployeeIndex + i + 1);
+                bool isDutyDay = ((day - startDay) % 4 + 4) % 4 == 0;
 
                 cells.Add(new RosterCell
                 {
@@ -105,7 +103,7 @@ public class RosterCalculationService
     }
 
     /// <summary>
-    /// Автозаполнение сетки для схемы «2 через 2» (по 12 часов: День / Ночь).
+    /// Автозаполнение сетки для схемы «2 через 2» (по 12 часов: День / Ночь) с учетом стартового дня.
     /// В каждые сутки задействовано 2 сотрудника (12ч день + 12ч ночь) = строго 24 часа на пост!
     /// </summary>
     public List<RosterCell> AutoFillTwoTwo(int scheduleId, List<Employee> employees, int year, int month)
@@ -115,36 +113,32 @@ public class RosterCalculationService
 
         int daysInMonth = DateTime.DaysInMonth(year, month);
 
-        // 4 смены/бригады:
-        // Смена 1: Д, Д, В, В
-        // Смена 2: В, В, Д, Д
-        // Смена 3: Н, Н, В, В
-        // Смена 4: В, В, Н, Н
         for (int day = 1; day <= daysInMonth; day++)
         {
-            int cycleDay = (day - 1) % 4; // 0, 1, 2, 3
-
             for (int i = 0; i < employees.Count; i++)
             {
                 var emp = employees[i];
+                int startDay = emp.InitialShiftDay > 0 ? emp.InitialShiftDay : ((i % 2 == 0) ? 1 : 3);
+                string pattern = emp.ShiftPattern ?? "2/2";
+
                 string code = "В";
                 double dh = 0, nh = 0, th = 0;
 
-                if (i == 0) // Дневная смена А
+                int cycleDay = ((day - startDay) % 4 + 4) % 4;
+                if (cycleDay is 0 or 1)
                 {
-                    if (cycleDay is 0 or 1) { code = "Д12"; dh = 12; th = 12; }
-                }
-                else if (i == 1) // Дневная смена Б
-                {
-                    if (cycleDay is 2 or 3) { code = "Д12"; dh = 12; th = 12; }
-                }
-                else if (i == 2) // Ночная смена А
-                {
-                    if (cycleDay is 0 or 1) { code = "Н12"; nh = 12; th = 12; }
-                }
-                else if (i == 3) // Ночная смена Б
-                {
-                    if (cycleDay is 2 or 3) { code = "Н12"; nh = 12; th = 12; }
+                    if (pattern.Contains("Ночь", StringComparison.OrdinalIgnoreCase) || i >= 2)
+                    {
+                        code = "Н12";
+                        nh = 12.0;
+                        th = 12.0;
+                    }
+                    else
+                    {
+                        code = "Д12";
+                        dh = 12.0;
+                        th = 12.0;
+                    }
                 }
 
                 cells.Add(new RosterCell
