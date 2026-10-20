@@ -30,6 +30,12 @@ public partial class SetupWizardDialog : Window
         AddAnotherPostButton.Click += OnAddAnotherPostClicked;
         FinishWizardButton.Click += OnFinishWizardClicked;
 
+        string existingOrg = DatabaseService.Instance.GetOrganizationName();
+        if (!string.IsNullOrWhiteSpace(existingOrg))
+        {
+            OrganizationNameBox.Text = existingOrg;
+        }
+
         UpdateStepView();
     }
 
@@ -65,12 +71,21 @@ public partial class SetupWizardDialog : Window
     {
         if (_currentStep == 1)
         {
+            string orgName = OrganizationNameBox.Text?.Trim() ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(orgName))
+            {
+                OrganizationNameBox.Focus();
+                return;
+            }
+
             string depName = DepartmentNameBox.Text?.Trim() ?? string.Empty;
             if (string.IsNullOrWhiteSpace(depName))
             {
                 DepartmentNameBox.Focus();
                 return;
             }
+
+            DatabaseService.Instance.SetOrganizationName(orgName);
 
             // Инициализируем строки сотрудников, если они еще не созданы
             if (_employees.Count == 0)

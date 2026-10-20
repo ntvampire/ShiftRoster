@@ -156,6 +156,11 @@ public class DatabaseService
                 FullName TEXT NOT NULL UNIQUE,
                 LastUsedAt TEXT NOT NULL
             );
+
+            CREATE TABLE IF NOT EXISTS AppSettings (
+                Key TEXT PRIMARY KEY,
+                Value TEXT
+            );
         ";
         command.ExecuteNonQuery();
 
@@ -296,6 +301,28 @@ public class DatabaseService
             DELETE FROM ShiftSchedules;
             DELETE FROM Employees;
         ";
+        cmd.ExecuteNonQuery();
+    }
+
+    public string GetOrganizationName()
+    {
+        using var conn = new SqliteConnection(_connectionString);
+        conn.Open();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = "SELECT Value FROM AppSettings WHERE Key = 'OrganizationName' LIMIT 1";
+        var val = cmd.ExecuteScalar() as string;
+        return val ?? string.Empty;
+    }
+
+    public void SetOrganizationName(string name)
+    {
+        using var conn = new SqliteConnection(_connectionString);
+        conn.Open();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = @"
+            INSERT INTO AppSettings (Key, Value) VALUES ('OrganizationName', @val)
+            ON CONFLICT(Key) DO UPDATE SET Value = @val";
+        cmd.Parameters.AddWithValue("@val", name.Trim());
         cmd.ExecuteNonQuery();
     }
 

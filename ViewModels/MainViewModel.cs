@@ -31,6 +31,9 @@ public partial class MainViewModel : ViewModelBase
     private string _selectedPost = "Смена №1 (Пост 1)";
 
     [ObservableProperty]
+    private string _organizationName = string.Empty;
+
+    [ObservableProperty]
     private string _windowTitle = "График смен";
 
     [ObservableProperty]
@@ -108,10 +111,13 @@ public partial class MainViewModel : ViewModelBase
             DayBalances.Add(new DayBalanceViewModel(d));
         }
 
+        OrganizationName = DatabaseService.Instance.GetOrganizationName();
+        string orgPrefix = string.IsNullOrWhiteSpace(OrganizationName) ? "" : $"{OrganizationName} — ";
+
         // Если подразделение еще не настроено
         if (string.IsNullOrWhiteSpace(CurrentPostName) || AvailablePosts.Count == 0)
         {
-            WindowTitle = $"График смен — {CurrentMonthName} {year} (Подразделение не выбрано)";
+            WindowTitle = $"{orgPrefix}График смен — {CurrentMonthName} {year} (Подразделение не выбрано)";
             Rows.Clear();
             BalanceStatusBanner = "ℹ️ Подразделения не настроены. Нажмите «🧙 Мастер настройки», чтобы внести смену и сотрудников.";
             BalanceBannerBackground = "#2B3A4A";
@@ -120,7 +126,7 @@ public partial class MainViewModel : ViewModelBase
             return;
         }
 
-        WindowTitle = $"График смен — {CurrentMonthName} {year} ({CurrentPostName})";
+        WindowTitle = $"{orgPrefix}График смен — {CurrentMonthName} {year} ({CurrentPostName})";
 
         // Получаем или создаем график в БД
         _currentSchedule = DatabaseService.Instance.GetOrCreateSchedule(year, month, CurrentPostName, "1/3");

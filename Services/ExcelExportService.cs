@@ -73,18 +73,25 @@ public class ExcelExportService
         var ws = workbook.Worksheets.Add(sheetName);
         ws.ShowGridLines = true;
 
+        string orgName = DatabaseService.Instance.GetOrganizationName();
+
         // Заголовок документа
         ws.Cell("A1").Value = "СВОДНАЯ ВЕДОМОСТЬ РАБОЧЕГО ВРЕМЕНИ ДЛЯ ВНЕСЕНИЯ В 1С";
         ws.Cell("A1").Style.Font.Bold = true;
         ws.Cell("A1").Style.Font.FontSize = 14;
         ws.Range("A1:K1").Merge();
 
-        ws.Cell("A2").Value = $"Подразделение/Пост: {schedule.PostName}  |  Отчетный период: {ShiftSchedule.GetMonthName(schedule.Month)} {schedule.Year} г.";
-        ws.Cell("A2").Style.Font.Italic = true;
+        ws.Cell("A2").Value = $"Организация: {(!string.IsNullOrWhiteSpace(orgName) ? orgName : "________________")}";
+        ws.Cell("A2").Style.Font.Bold = true;
         ws.Cell("A2").Style.Font.FontSize = 11;
         ws.Range("A2:K2").Merge();
 
-        int startRow = 4;
+        ws.Cell("A3").Value = $"Подразделение/Пост: {schedule.PostName}  |  Отчетный период: {ShiftSchedule.GetMonthName(schedule.Month)} {schedule.Year} г.";
+        ws.Cell("A3").Style.Font.Italic = true;
+        ws.Cell("A3").Style.Font.FontSize = 10;
+        ws.Range("A3:K3").Merge();
+
+        int startRow = 5;
         WriteSummaryTableHeader(ws, startRow);
 
         int currentRow = startRow + 1;
@@ -116,17 +123,24 @@ public class ExcelExportService
         var ws = workbook.Worksheets.Add("Общая сводка (Все смены)");
         ws.ShowGridLines = true;
 
+        string orgName = DatabaseService.Instance.GetOrganizationName();
+
         ws.Cell("A1").Value = "ОБЩАЯ СВОДНАЯ ВЕДОМОСТЬ ПО ВСЕМ СМЕНАМ ДЛЯ ВНЕСЕНИЯ В 1С";
         ws.Cell("A1").Style.Font.Bold = true;
         ws.Cell("A1").Style.Font.FontSize = 15;
         ws.Range("A1:K1").Merge();
 
-        ws.Cell("A2").Value = $"Все подразделения предприятия  |  Период: {ShiftSchedule.GetMonthName(month)} {year} г.";
-        ws.Cell("A2").Style.Font.Italic = true;
-        ws.Cell("A2").Style.Font.FontSize = 11;
+        ws.Cell("A2").Value = $"Организация: {(!string.IsNullOrWhiteSpace(orgName) ? orgName : "Все подразделения предприятия")}";
+        ws.Cell("A2").Style.Font.Bold = true;
+        ws.Cell("A2").Style.Font.FontSize = 12;
         ws.Range("A2:K2").Merge();
 
-        int currentRow = 4;
+        ws.Cell("A3").Value = $"Отчетный период: {ShiftSchedule.GetMonthName(month)} {year} г.";
+        ws.Cell("A3").Style.Font.Italic = true;
+        ws.Cell("A3").Style.Font.FontSize = 10;
+        ws.Range("A3:K3").Merge();
+
+        int currentRow = 5;
         var subtotalRows = new List<int>();
         int globalOrder = 1;
 
@@ -333,23 +347,30 @@ public class ExcelExportService
         var ws = workbook.Worksheets.Add(sheetName);
         ws.ShowGridLines = true;
 
+        string orgName = DatabaseService.Instance.GetOrganizationName();
+
         ws.Cell("A1").Value = "Унифицированная форма № Т-13";
         ws.Cell("A1").Style.Font.FontSize = 8;
         ws.Cell("A1").Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Right;
         ws.Range("A1:U1").Merge();
 
-        ws.Cell("A2").Value = "ТАБЕЛЬ УЧЕТА РАБОЧЕГО ВРЕМЕНИ";
+        ws.Cell("A2").Value = $"Организация: {(!string.IsNullOrWhiteSpace(orgName) ? orgName : "________________")}";
         ws.Cell("A2").Style.Font.Bold = true;
-        ws.Cell("A2").Style.Font.FontSize = 12;
-        ws.Cell("A2").Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+        ws.Cell("A2").Style.Font.FontSize = 11;
         ws.Range("A2:U2").Merge();
 
-        ws.Cell("A3").Value = $"Подразделение/Участок: {schedule.PostName}  |  Период: с 01.{schedule.Month:D2}.{schedule.Year} по {DateTime.DaysInMonth(schedule.Year, schedule.Month):D2}.{schedule.Month:D2}.{schedule.Year}";
-        ws.Cell("A3").Style.Font.FontSize = 10;
+        ws.Cell("A3").Value = "ТАБЕЛЬ УЧЕТА РАБОЧЕГО ВРЕМЕНИ";
+        ws.Cell("A3").Style.Font.Bold = true;
+        ws.Cell("A3").Style.Font.FontSize = 12;
         ws.Cell("A3").Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
         ws.Range("A3:U3").Merge();
 
-        int startRow = 5;
+        ws.Cell("A4").Value = $"Подразделение/Участок: {schedule.PostName}  |  Период: с 01.{schedule.Month:D2}.{schedule.Year} по {DateTime.DaysInMonth(schedule.Year, schedule.Month):D2}.{schedule.Month:D2}.{schedule.Year}";
+        ws.Cell("A4").Style.Font.FontSize = 10;
+        ws.Cell("A4").Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+        ws.Range("A4:U4").Merge();
+
+        int startRow = 6;
         ws.Cell(startRow, 1).Value = "№ п/п";
         ws.Range(startRow, 1, startRow + 1, 1).Merge();
 

@@ -152,6 +152,16 @@ public static class VerificationTests
         }
         Console.WriteLine($"[УСПЕХ] (Сводный отчет по {posts.Count} сменам сформирован: {fiConsolidated.Length} байт)");
 
+        // 7. Проверка наименования организации в базе и отчетах
+        Console.Write("7. Название организации в базе и отчетах... ");
+        db.SetOrganizationName("ООО «Тестовые Энергосистемы»");
+        string storedOrg = db.GetOrganizationName();
+        if (storedOrg != "ООО «Тестовые Энергосистемы»")
+        {
+            throw new Exception("Название организации не сохранилось в базе данных!");
+        }
+        Console.WriteLine($"[УСПЕХ] (Организация: {storedOrg})");
+
         Console.WriteLine("=================================================");
         Console.WriteLine("ВСЕ ТЕСТЫ И ТРЕБОВАНИЯ ТЗ УСПЕШНО ВЫПОЛНЕНЫ!");
         Console.WriteLine("=================================================");

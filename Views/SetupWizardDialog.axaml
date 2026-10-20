@@ -29,12 +29,20 @@
             <StackPanel x:Name="Step1Panel" Spacing="16" IsVisible="True" VerticalAlignment="Center">
                 <Border Background="#252525" CornerRadius="8" Padding="20" BorderBrush="#383838" BorderThickness="1">
                     <StackPanel Spacing="16">
-                        <TextBlock Text="1. Основные параметры подразделения" FontWeight="SemiBold" FontSize="15" Foreground="White" />
+                        <TextBlock Text="1. Параметры организации и подразделения" FontWeight="SemiBold" FontSize="15" Foreground="White" />
+
+                        <!-- Название организации (самое первое поле) -->
+                        <StackPanel Spacing="6">
+                            <TextBlock Text="Название организации (предприятия):" FontWeight="Bold" Foreground="#0078D4" FontSize="13" />
+                            <TextBox x:Name="OrganizationNameBox" Watermark="Например: ООО «Северные Энергосети», МУП «Водоканал»..." FontSize="14" Height="36" />
+                            <TextBlock Text="* Обязательно указывается в шапках официального бланка Т-13 и сводных ведомостях для 1С." 
+                                       Foreground="#777777" FontSize="11" />
+                        </StackPanel>
 
                         <!-- Название подразделения -->
                         <StackPanel Spacing="6">
                             <TextBlock Text="Название подразделения / смены / поста:" Foreground="#CCCCCC" FontSize="13" />
-                            <TextBox x:Name="DepartmentNameBox" Watermark="Например: Диспетчерская, Котельная, Охрана КПП-1, Смена №1..." FontSize="14" Height="36" />
+                            <TextBox x:Name="DepartmentNameBox" Watermark="Например: Котельная, Диспетчерская, Охрана КПП-1..." FontSize="14" Height="36" />
                             <TextBlock Text="* Это название будет отображаться в табеле, отчетах 1С и унифицированной форме Т-13." 
                                        Foreground="#777777" FontSize="11" />
                         </StackPanel>
