@@ -41,7 +41,11 @@ public static class VerificationTests
         var posts = db.GetAllPostNames();
         if (posts.Count == 0)
         {
-            throw new Exception("Не найдено доступных смен/постов!");
+            db.SaveEmployee(new Employee { FullName = "Иванов С.П.", Position = "Старший смены", PostName = "Тестовая смена", InitialShiftDay = 1 });
+            db.SaveEmployee(new Employee { FullName = "Петров А.В.", Position = "Дежурный оператор", PostName = "Тестовая смена", InitialShiftDay = 2 });
+            db.SaveEmployee(new Employee { FullName = "Сидоров М.Н.", Position = "Дежурный оператор", PostName = "Тестовая смена", InitialShiftDay = 3 });
+            db.SaveEmployee(new Employee { FullName = "Кузнецов Д.А.", Position = "Дежурный оператор", PostName = "Тестовая смена", InitialShiftDay = 4 });
+            posts = db.GetAllPostNames();
         }
 
         string firstPost = posts[0];

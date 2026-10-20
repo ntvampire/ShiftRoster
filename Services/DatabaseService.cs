@@ -175,43 +175,6 @@ public class DatabaseService
             alterCmd2.ExecuteNonQuery();
         }
         catch { }
-
-        // Проверяем, есть ли сотрудники. Если нет — создаем начальный штат для демонстрации
-        command.CommandText = "SELECT COUNT(*) FROM Employees";
-        long empCount = (long)(command.ExecuteScalar() ?? 0);
-        if (empCount == 0)
-        {
-            SeedInitialEmployees(connection);
-        }
-    }
-
-    private void SeedInitialEmployees(SqliteConnection connection)
-    {
-        var defaults = new[]
-        {
-            ("Иванов Сергей Петрович", "Старший смены", "Смена №1 (Пост 1)", 1, "1/3"),
-            ("Петров Алексей Владимирович", "Дежурный оператор", "Смена №1 (Пост 1)", 2, "1/3"),
-            ("Сидоров Михаил Николаевич", "Дежурный оператор", "Смена №1 (Пост 1)", 3, "1/3"),
-            ("Кузнецов Дмитрий Александрович", "Дежурный оператор", "Смена №1 (Пост 1)", 4, "1/3"),
-            ("Васильев Роман Игоревич", "Старший смены", "Смена №2 (Пост 2)", 1, "1/3"),
-            ("Николаев Виктор Сергеевич", "Дежурный оператор", "Смена №2 (Пост 2)", 2, "1/3"),
-            ("Федоров Андрей Павлович", "Дежурный оператор", "Смена №2 (Пост 2)", 3, "1/3"),
-            ("Морозов Константин Юрьевич", "Дежурный оператор", "Смена №2 (Пост 2)", 4, "1/3")
-        };
-
-        foreach (var (name, pos, post, startDay, pattern) in defaults)
-        {
-            using var cmd = connection.CreateCommand();
-            cmd.CommandText = @"
-                INSERT INTO Employees (FullName, Position, PostName, IsPermanent, IsActive, InitialShiftDay, ShiftPattern)
-                VALUES (@name, @pos, @post, 1, 1, @startDay, @pattern)";
-            cmd.Parameters.AddWithValue("@name", name);
-            cmd.Parameters.AddWithValue("@pos", pos);
-            cmd.Parameters.AddWithValue("@post", post);
-            cmd.Parameters.AddWithValue("@startDay", startDay);
-            cmd.Parameters.AddWithValue("@pattern", pattern);
-            cmd.ExecuteNonQuery();
-        }
     }
 
     // --- Методы для работы с сотрудниками ---
@@ -317,13 +280,23 @@ public class DatabaseService
             }
         }
 
-        if (posts.Count == 0)
-        {
-            posts.Add("Смена №1 (Пост 1)");
-            posts.Add("Смена №2 (Пост 2)");
-        }
-
         return posts.OrderBy(p => p).ToList();
+    }
+
+    /// <summary>
+    /// Полная очистка всех смен, сотрудников и графиков (без удаления производственного календаря)
+    /// </summary>
+    public void ClearAllRosterData()
+    {
+        using var conn = new SqliteConnection(_connectionString);
+        conn.Open();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = @"
+            DELETE FROM RosterCells;
+            DELETE FROM ShiftSchedules;
+            DELETE FROM Employees;
+        ";
+        cmd.ExecuteNonQuery();
     }
 
     public List<ShiftSchedule> GetAllSchedulesForMonth(int year, int month)
@@ -368,6 +341,18 @@ public class DatabaseService
     // --- Методы для работы с графиками и ячейками табеля ---
     public ShiftSchedule GetOrCreateSchedule(int year, int month, string postName, string defaultPattern = "1/3")
     {
+        if (string.IsNullOrWhiteSpace(postName))
+        {
+            return new ShiftSchedule
+            {
+                Year = year,
+                Month = month,
+                Name = "Подразделение не выбрано",
+                PostName = string.Empty,
+                PatternType = defaultPattern
+            };
+        }
+
         using var conn = new SqliteConnection(_connectionString);
         conn.Open();
 

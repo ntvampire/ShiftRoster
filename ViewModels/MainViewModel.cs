@@ -50,6 +50,8 @@ public partial class MainViewModel : ViewModelBase
     public ObservableCollection<DayColumnHeaderViewModel> DayHeaders { get; } = new();
     public ObservableCollection<DayBalanceViewModel> DayBalances { get; } = new();
 
+    public bool ShouldRunWizardOnStartup { get; set; }
+
     public MainViewModel()
     {
         RefreshPosts();
@@ -57,6 +59,13 @@ public partial class MainViewModel : ViewModelBase
         {
             _selectedPost = AvailablePosts[0];
             _currentPostName = _selectedPost;
+            ShouldRunWizardOnStartup = false;
+        }
+        else
+        {
+            _selectedPost = string.Empty;
+            _currentPostName = string.Empty;
+            ShouldRunWizardOnStartup = true;
         }
         LoadMonth(CurrentYear, CurrentMonth);
     }
@@ -85,10 +94,33 @@ public partial class MainViewModel : ViewModelBase
         CurrentYear = year;
         CurrentMonth = month;
         CurrentMonthName = ShiftSchedule.GetMonthName(month);
-        WindowTitle = $"График смен — {CurrentMonthName} {year} ({CurrentPostName})";
 
         // Загружаем производственный календарь на выбранный год
         ProductionCalendarService.Instance.LoadYear(year);
+
+        // Построение заголовков дней
+        DayHeaders.Clear();
+        DayBalances.Clear();
+        int daysInMonth = DateTime.DaysInMonth(year, month);
+        for (int d = 1; d <= daysInMonth; d++)
+        {
+            DayHeaders.Add(new DayColumnHeaderViewModel(year, month, d));
+            DayBalances.Add(new DayBalanceViewModel(d));
+        }
+
+        // Если подразделение еще не настроено
+        if (string.IsNullOrWhiteSpace(CurrentPostName) || AvailablePosts.Count == 0)
+        {
+            WindowTitle = $"График смен — {CurrentMonthName} {year} (Подразделение не выбрано)";
+            Rows.Clear();
+            BalanceStatusBanner = "ℹ️ Подразделения не настроены. Нажмите «🧙 Мастер настройки», чтобы внести смену и сотрудников.";
+            BalanceBannerBackground = "#2B3A4A";
+            StatusMessage = "Требуется первичная настройка";
+            ShouldRunWizardOnStartup = true;
+            return;
+        }
+
+        WindowTitle = $"График смен — {CurrentMonthName} {year} ({CurrentPostName})";
 
         // Получаем или создаем график в БД
         _currentSchedule = DatabaseService.Instance.GetOrCreateSchedule(year, month, CurrentPostName, "1/3");
@@ -105,16 +137,6 @@ public partial class MainViewModel : ViewModelBase
                 cells = RosterCalculationService.Instance.AutoFillOneThree(_currentSchedule.Id, employees, year, month);
                 DatabaseService.Instance.SaveRosterCells(_currentSchedule.Id, cells);
             }
-        }
-
-        // Построение заголовков дней
-        DayHeaders.Clear();
-        DayBalances.Clear();
-        int daysInMonth = DateTime.DaysInMonth(year, month);
-        for (int d = 1; d <= daysInMonth; d++)
-        {
-            DayHeaders.Add(new DayColumnHeaderViewModel(year, month, d));
-            DayBalances.Add(new DayBalanceViewModel(d));
         }
 
         // Построение строк сотрудников

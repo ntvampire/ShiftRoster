@@ -18,8 +18,40 @@ public partial class MainWindow : Window
         ExportExcelButton.Click += OnExportExcelClicked;
         ExportConsolidatedButton.Click += OnExportConsolidatedClicked;
         ManageEmployeesButton.Click += OnManageEmployeesClicked;
+        SetupWizardButton.Click += OnSetupWizardClicked;
         ExportCurrentMenuItem.Click += OnExportExcelClicked;
         ExportAllMenuItem.Click += OnExportConsolidatedClicked;
+
+        Loaded += OnMainWindowLoaded;
+    }
+
+    private async void OnMainWindowLoaded(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is MainViewModel vm && vm.ShouldRunWizardOnStartup)
+        {
+            await OpenSetupWizardAsync(vm);
+        }
+    }
+
+    private async void OnSetupWizardClicked(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is MainViewModel vm)
+        {
+            await OpenSetupWizardAsync(vm);
+        }
+    }
+
+    private async System.Threading.Tasks.Task OpenSetupWizardAsync(MainViewModel vm)
+    {
+        var dialog = new SetupWizardDialog();
+        bool result = await dialog.ShowDialog<bool>(this);
+        if (result && dialog.HasCreatedAnyPost)
+        {
+            vm.RefreshPosts();
+            vm.SelectedPost = dialog.FirstCreatedPost;
+            vm.LoadMonth(vm.CurrentYear, vm.CurrentMonth);
+            vm.StatusMessage = $"Подразделение «{dialog.FirstCreatedPost}» настроено! График сформирован.";
+        }
     }
 
     public void OnCellButtonClicked(object? sender, RoutedEventArgs e)

@@ -45,6 +45,13 @@
 
                 <!-- Основные команды / Кнопки действий -->
                 <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                    <Button x:Name="SetupWizardButton" Background="#005A9E" ToolTip.Tip="Мастер быстрой первичной настройки смен и сотрудников">
+                        <StackPanel Orientation="Horizontal" Spacing="4">
+                            <TextBlock Text="🧙" />
+                            <TextBlock Text="Мастер настройки" />
+                        </StackPanel>
+                    </Button>
+
                     <Button x:Name="ManageEmployeesButton" ToolTip.Tip="Управление сотрудниками, сменами и днями старта графиков">
                         <StackPanel Orientation="Horizontal" Spacing="4">
                             <TextBlock Text="👥" />
