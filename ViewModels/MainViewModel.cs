@@ -229,6 +229,12 @@ public partial class MainViewModel : ViewModelBase
 
         switch (shiftType)
         {
+            case "16":
+                SelectedCell.SetShift("16", 14.0, 2.0);
+                break;
+            case "8":
+                SelectedCell.SetShift("8", 2.0, 6.0);
+                break;
             case "С24":
                 SelectedCell.SetShift("С24", 16.0, 8.0);
                 break;
@@ -237,9 +243,6 @@ public partial class MainViewModel : ViewModelBase
                 break;
             case "Н12":
                 SelectedCell.SetShift("Н12", 0.0, 12.0);
-                break;
-            case "8":
-                SelectedCell.SetShift("8", 8.0, 0.0);
                 break;
             case "В":
                 SelectedCell.SetShift("В", 0.0, 0.0);

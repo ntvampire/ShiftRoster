@@ -85,7 +85,9 @@ public partial class RosterCellViewModel : ObservableObject
         {
             if (Model.ShiftCode == "О") return "#1B4D2E"; // Отпуск — приглушенный зеленый
             if (Model.ShiftCode == "Б") return "#5A3D1A"; // Больничный — приглушенный оранжево-коричневый
-            if (Model.TotalHours == 24) return "#1F3B5C"; // Сутки 24ч — глубокий темно-синий
+            if (Model.TotalHours == 16) return "#1F3B5C"; // Заступление 16ч — глубокий темно-синий
+            if (Model.TotalHours == 8 && Model.NightHours > 0) return "#2D2750"; // Сдача смены 8ч (ночные) — фиолетовый
+            if (Model.TotalHours == 24) return "#1F3B5C"; // Сутки 24ч
             if (Model.ShiftCode == "Н12") return "#2D2750"; // Ночная смена — темно-фиолетовый
             if (Model.TotalHours > 0) return "#2B4036"; // Дневная смена 12ч / 8ч — хвойно-серый
 

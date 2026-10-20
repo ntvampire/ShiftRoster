@@ -63,9 +63,11 @@ public class RosterCalculationService
     }
 
     /// <summary>
-    /// Автозаполнение сетки для схемы «Сутки через трое (1/3)» с учетом стартового дня каждого сотрудника
-    /// Смена 24 часа (16 ч день + 8 ч ночь), затем 3 дня выходных.
-    /// Итого в любой день месяца дежурит ровно 1 сотрудник = строго 24 часа на пост!
+    /// Автозаполнение сетки для схемы «Сутки через трое (1/3)» с разбивкой 16 часов / 8 часов следующего дня.
+    /// Заступление: 16 часов (14ч день + 2ч ночь с 22:00 до 24:00).
+    /// Сдача смены на следующий день: 8 часов (2ч день + 6ч ночь с 00:00 до 06:00).
+    /// Затем 2 дня отдыха (отсыпной и выходной).
+    /// Итого в каждые сутки на посту дежурит 1 сдающий (8ч) + 1 заступающий (16ч) = ровно 24 часа!
     /// </summary>
     public List<RosterCell> AutoFillOneThree(int scheduleId, List<Employee> employees, int year, int month, int startShiftEmployeeIndex = 0)
     {
@@ -81,7 +83,29 @@ public class RosterCalculationService
             {
                 var emp = employees[i];
                 int startDay = hasCustomStartDays ? emp.InitialShiftDay : (startShiftEmployeeIndex + i + 1);
-                bool isDutyDay = ((day - startDay) % 4 + 4) % 4 == 0;
+
+                // 0: заступление на смену (16ч)
+                // 1: сдача смены утром (8ч)
+                // 2, 3: выходные дни
+                int cycleDay = ((day - startDay) % 4 + 4) % 4;
+
+                string code = "В";
+                double dh = 0, nh = 0, th = 0;
+
+                if (cycleDay == 0)
+                {
+                    code = "16";
+                    dh = 14.0;
+                    nh = 2.0;
+                    th = 16.0;
+                }
+                else if (cycleDay == 1)
+                {
+                    code = "8";
+                    dh = 2.0;
+                    nh = 6.0;
+                    th = 8.0;
+                }
 
                 cells.Add(new RosterCell
                 {
@@ -90,10 +114,10 @@ public class RosterCalculationService
                     EmployeeName = emp.FullName,
                     Position = emp.Position,
                     DayOfMonth = day,
-                    ShiftCode = isDutyDay ? "С24" : "В",
-                    DayHours = isDutyDay ? 16.0 : 0,
-                    NightHours = isDutyDay ? 8.0 : 0,
-                    TotalHours = isDutyDay ? 24.0 : 0,
+                    ShiftCode = code,
+                    DayHours = dh,
+                    NightHours = nh,
+                    TotalHours = th,
                     IsSubstitute = false
                 });
             }

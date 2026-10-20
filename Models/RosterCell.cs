@@ -45,7 +45,6 @@ public partial class RosterCell : ObservableObject
             if (ShiftCode == "О") return "О";
             if (ShiftCode == "Б") return "Б";
             if (ShiftCode == "В") return "В";
-            if (ShiftCode == "С24" || TotalHours == 24) return "24";
             if (TotalHours > 0) return TotalHours.ToString("0.#");
             return ShiftCode;
         }
@@ -60,12 +59,14 @@ public partial class RosterCell : ObservableObject
         {
             if (IsSubstitute)
             {
-                return $"{EmployeeName} (Подмена за {SubstitutedForName}): {ShiftCode}, {TotalHours} ч (День: {DayHours}, Ночь: {NightHours})";
+                return $"{EmployeeName} (Подмена за {SubstitutedForName}): {TotalHours} ч (День: {DayHours}, Ночь: {NightHours})";
             }
             if (ShiftCode == "О") return $"{EmployeeName}: Отпуск";
             if (ShiftCode == "Б") return $"{EmployeeName}: Больничный";
             if (ShiftCode == "В") return $"{EmployeeName}: Выходной";
-            return $"{EmployeeName}: {ShiftCode}, всего {TotalHours} ч (День: {DayHours}, Ночь: {NightHours})";
+            if (TotalHours == 16) return $"{EmployeeName}: Заступление на смену 16 ч (День: {DayHours}, Ночь: {NightHours})";
+            if (TotalHours == 8) return $"{EmployeeName}: Сдача смены 8 ч (Ночь: {NightHours}, День: {DayHours})";
+            return $"{EmployeeName}: {TotalHours} ч (День: {DayHours}, Ночь: {NightHours})";
         }
     }
 }

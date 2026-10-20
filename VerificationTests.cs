@@ -88,7 +88,14 @@ public static class VerificationTests
             var invalid = validation.First(v => !v.IsValid);
             throw new Exception($"Нарушен суточный баланс 24ч: {invalid.Message}");
         }
-        Console.WriteLine($"[УСПЕХ] (Все {daysInMonth} дней закрывают ровно 24.0 ч)");
+
+        bool has16 = cells.Any(c => c.TotalHours == 16.0);
+        bool has8 = cells.Any(c => c.TotalHours == 8.0);
+        if (!has16 || !has8)
+        {
+            throw new Exception("Разбивка смены 16ч / 8ч следующего дня не сформирована!");
+        }
+        Console.WriteLine($"[УСПЕХ] (Разбивка 16ч/8ч работает, все {daysInMonth} дней закрывают ровно 24.0 ч)");
 
         // 5. Проверка механизма подмен (произвольное ФИО)
         Console.Write("5. Замещение при отпуске (произвольное ФИО подменного)... ");

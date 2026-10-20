@@ -275,9 +275,14 @@
                 <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
                     <TextBlock Text="Быстрая смена:" VerticalAlignment="Center" Foreground="#888888" FontSize="12" Margin="0,0,6,0" />
 
-                    <Button Command="{Binding ApplyShiftCommand}" CommandParameter="С24" 
-                            Background="#1F3B5C" ToolTip.Tip="Сутки: 24 часа (16ч день + 8ч ночь)">
-                        <TextBlock Text="24ч (Сутки)" FontSize="12" Foreground="White" />
+                    <Button Command="{Binding ApplyShiftCommand}" CommandParameter="16" 
+                            Background="#1F3B5C" ToolTip.Tip="16 часов: заступление на смену (14ч день + 2ч ночь)">
+                        <TextBlock Text="16ч (Заступл.)" FontSize="12" Foreground="White" />
+                    </Button>
+
+                    <Button Command="{Binding ApplyShiftCommand}" CommandParameter="8" 
+                            Background="#2D2750" ToolTip.Tip="8 часов: сдача смены утром (2ч день + 6ч ночь)">
+                        <TextBlock Text="8ч (Сдача)" FontSize="12" Foreground="White" />
                     </Button>
 
                     <Button Command="{Binding ApplyShiftCommand}" CommandParameter="Д12" 
@@ -286,13 +291,8 @@
                     </Button>
 
                     <Button Command="{Binding ApplyShiftCommand}" CommandParameter="Н12" 
-                            Background="#2D2750" ToolTip.Tip="Ночная смена: 12 часов">
+                            Background="#3E2C58" ToolTip.Tip="Ночная смена: 12 часов">
                         <TextBlock Text="12ч (Ночь)" FontSize="12" Foreground="White" />
-                    </Button>
-
-                    <Button Command="{Binding ApplyShiftCommand}" CommandParameter="8" 
-                            Background="#333333" ToolTip.Tip="8-часовая рабочая смена">
-                        <TextBlock Text="8ч" FontSize="12" Foreground="White" />
                     </Button>
 
                     <Button Command="{Binding ApplyShiftCommand}" CommandParameter="В" 
