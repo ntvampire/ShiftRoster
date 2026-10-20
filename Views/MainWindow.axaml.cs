@@ -22,6 +22,14 @@ public partial class MainWindow : Window
         ExportAllMenuItem.Click += OnExportConsolidatedClicked;
     }
 
+    public void OnCellButtonClicked(object? sender, RoutedEventArgs e)
+    {
+        if (sender is Button btn && btn.DataContext is RosterCellViewModel cellVm && DataContext is MainViewModel vm)
+        {
+            vm.SelectCell(cellVm);
+        }
+    }
+
     private async void OnManageEmployeesClicked(object? sender, RoutedEventArgs e)
     {
         if (DataContext is not MainViewModel vm) return;

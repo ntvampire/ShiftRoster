@@ -203,8 +203,7 @@
                                                             BorderBrush="{Binding CellBorderBrush}"
                                                             BorderThickness="1"
                                                             ToolTip.Tip="{Binding TooltipText}"
-                                                            Command="{Binding $parent[Window].((vm:MainViewModel)DataContext).SelectCellCommand}"
-                                                            CommandParameter="{Binding}">
+                                                            Click="OnCellButtonClicked">
                                                         <TextBlock Text="{Binding DisplayText}" 
                                                                    FontWeight="SemiBold" FontSize="12" 
                                                                    Foreground="White"
