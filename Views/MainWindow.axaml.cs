@@ -29,6 +29,16 @@ public partial class MainWindow : Window
         ExportConsolidatedSidebarButton.Click += OnExportConsolidatedClicked;
 
         Loaded += OnMainWindowLoaded;
+        Deactivated += (_, _) =>
+        {
+            _isCtrlPressed = false;
+            _isShiftPressed = false;
+        };
+        LostFocus += (_, _) =>
+        {
+            _isCtrlPressed = false;
+            _isShiftPressed = false;
+        };
     }
 
     protected override void OnKeyDown(KeyEventArgs e)
@@ -300,13 +310,25 @@ public partial class MainWindow : Window
         var point = e.GetCurrentPoint(btn);
         if (point.Properties.IsRightButtonPressed)
         {
-            // Если правый клик по ячейке, которая еще не в списке выделенных:
-            // сбрасываем предыдущие выделения и выделяем только ее.
-            // Если ячейка уже входит в диапазон выделения — сохраняем весь выделенный диапазон!
+            // Правый клик:
+            // Если ячейка еще не в списке выделенных: сбрасываем предыдущие выделения и выделяем только ее.
+            // Если ячейка УЖЕ входит в диапазон выделения — сохраняем весь выделенный диапазон!
             if (!vm.SelectedCells.Contains(cellVm))
             {
                 vm.SelectCell(cellVm, isCtrlPressed: false, isShiftPressed: false);
             }
+        }
+    }
+
+    public void OnCellPointerReleased(object? sender, PointerReleasedEventArgs e)
+    {
+        if (sender is not Button btn || btn.DataContext is not RosterCellViewModel cellVm || DataContext is not MainViewModel vm)
+            return;
+
+        if (e.InitialPressMouseButton == MouseButton.Right)
+        {
+            ShowCellContextMenu(btn, cellVm, vm);
+            e.Handled = true;
         }
     }
 
@@ -315,7 +337,17 @@ public partial class MainWindow : Window
         if (sender is not Button btn || btn.DataContext is not RosterCellViewModel cellVm || DataContext is not MainViewModel vm)
             return;
 
-        // Если ячейка еще не выделена, гарантируем ее выделение
+        ShowCellContextMenu(btn, cellVm, vm);
+        e.Handled = true;
+    }
+
+    private void ShowCellContextMenu(Button btn, RosterCellViewModel cellVm, MainViewModel vm)
+    {
+        // Предотвращаем повторное открытие, если меню уже открыто для этой ячейки
+        if (btn.ContextMenu?.IsOpen == true)
+            return;
+
+        // Если ячейка еще не выделена, выделяем ее
         if (!vm.SelectedCells.Contains(cellVm))
         {
             vm.SelectCell(cellVm, isCtrlPressed: false, isShiftPressed: false);
@@ -390,9 +422,16 @@ public partial class MainWindow : Window
         }
 
         menu.ItemsSource = items;
+
+        // КРИТИЧЕСКИ ВАЖНО: при закрытии меню сбрасываем ContextMenu кнопки в null,
+        // чтобы Avalonia никогда не блокировала последующие вызовы меню на этой и любых других ячейках!
+        menu.Closed += (_, _) =>
+        {
+            btn.ContextMenu = null;
+        };
+
         btn.ContextMenu = menu;
         menu.Open(btn);
-        e.Handled = true;
     }
 
     private async void OnAddNewPostClicked(object? sender, RoutedEventArgs e)

@@ -308,6 +308,7 @@
                                                                 ToolTip.Tip="{Binding TooltipText}"
                                                                 Click="OnCellButtonClicked"
                                                                 PointerPressed="OnCellPointerPressed"
+                                                                PointerReleased="OnCellPointerReleased"
                                                                 ContextRequested="OnCellContextRequested">
                                                             <TextBlock Text="{Binding DisplayText}" 
                                                                        FontWeight="SemiBold" FontSize="12" 
