@@ -143,19 +143,20 @@ public partial class MainViewModel : ViewModelBase
         // Загружаем ячейки из БД
         var cells = DatabaseService.Instance.GetRosterCells(_currentSchedule.Id);
 
-        // Если ячеек еще нет (новый месяц) — автоматически заполняем по схеме смены
+        // Если ячеек еще нет (новый месяц) — автоматически заполняем по схеме смены со сквозной непрерывностью
         if (cells.Count == 0)
         {
             var employees = DatabaseService.Instance.GetEmployees(CurrentPostName);
             if (employees.Count > 0)
             {
+                var (baseYear, baseMonth) = DatabaseService.Instance.GetPostBaseMonth(CurrentPostName);
                 if (CurrentPostPattern == "2/2")
                 {
-                    cells = RosterCalculationService.Instance.AutoFillTwoTwo(_currentSchedule.Id, employees, year, month);
+                    cells = RosterCalculationService.Instance.AutoFillTwoTwo(_currentSchedule.Id, employees, year, month, baseYear, baseMonth);
                 }
                 else
                 {
-                    cells = RosterCalculationService.Instance.AutoFillOneThree(_currentSchedule.Id, employees, year, month);
+                    cells = RosterCalculationService.Instance.AutoFillOneThree(_currentSchedule.Id, employees, year, month, baseYear, baseMonth);
                 }
                 DatabaseService.Instance.SaveRosterCells(_currentSchedule.Id, cells);
             }
@@ -460,15 +461,17 @@ public partial class MainViewModel : ViewModelBase
             return;
         }
 
+        var (baseYear, baseMonth) = DatabaseService.Instance.GetPostBaseMonth(CurrentPostName);
+
         List<RosterCell> cells;
         if (pattern == "2/2")
         {
-            cells = RosterCalculationService.Instance.AutoFillTwoTwo(_currentSchedule.Id, employees, CurrentYear, CurrentMonth);
+            cells = RosterCalculationService.Instance.AutoFillTwoTwo(_currentSchedule.Id, employees, CurrentYear, CurrentMonth, baseYear, baseMonth);
             StatusMessage = "График заполнен по схеме «2 через 2» (по 12ч День/Ночь).";
         }
         else
         {
-            cells = RosterCalculationService.Instance.AutoFillOneThree(_currentSchedule.Id, employees, CurrentYear, CurrentMonth);
+            cells = RosterCalculationService.Instance.AutoFillOneThree(_currentSchedule.Id, employees, CurrentYear, CurrentMonth, baseYear, baseMonth);
             StatusMessage = "График заполнен по схеме «Сутки через трое» (16ч/8ч, 24ч на пост).";
         }
 
@@ -595,13 +598,14 @@ public partial class MainViewModel : ViewModelBase
                 var employees = DatabaseService.Instance.GetEmployees(post);
                 if (employees.Count > 0)
                 {
+                    var (baseYear, baseMonth) = DatabaseService.Instance.GetPostBaseMonth(post);
                     if (pattern == "2/2")
                     {
-                        cells = RosterCalculationService.Instance.AutoFillTwoTwo(schedule.Id, employees, CurrentYear, CurrentMonth);
+                        cells = RosterCalculationService.Instance.AutoFillTwoTwo(schedule.Id, employees, CurrentYear, CurrentMonth, baseYear, baseMonth);
                     }
                     else
                     {
-                        cells = RosterCalculationService.Instance.AutoFillOneThree(schedule.Id, employees, CurrentYear, CurrentMonth);
+                        cells = RosterCalculationService.Instance.AutoFillOneThree(schedule.Id, employees, CurrentYear, CurrentMonth, baseYear, baseMonth);
                     }
                     DatabaseService.Instance.SaveRosterCells(schedule.Id, cells);
                 }

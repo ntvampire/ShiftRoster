@@ -357,6 +357,63 @@ public class DatabaseService
         cmd.ExecuteNonQuery();
     }
 
+    /// <summary>
+    /// Получение базового месяца, к которому привязаны стартовые дни сотрудников смены
+    /// </summary>
+    public (int Year, int Month) GetPostBaseMonth(string postName)
+    {
+        if (string.IsNullOrWhiteSpace(postName)) 
+            return (DateTime.Now.Year, DateTime.Now.Month);
+
+        string key = $"PostBaseMonth_{postName.Trim().ToLowerInvariant()}";
+        using var conn = new SqliteConnection(_connectionString);
+        conn.Open();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = "SELECT Value FROM AppSettings WHERE Key = @k LIMIT 1";
+        cmd.Parameters.AddWithValue("@k", key);
+        var val = cmd.ExecuteScalar() as string;
+        if (!string.IsNullOrWhiteSpace(val))
+        {
+            var parts = val.Split('-');
+            if (parts.Length == 2 && int.TryParse(parts[0], out int y) && int.TryParse(parts[1], out int m))
+            {
+                return (y, m);
+            }
+        }
+
+        // Если базовый месяц не задан явно, проверяем самый ранний сохраненный график
+        using var schedCmd = conn.CreateCommand();
+        schedCmd.CommandText = "SELECT Year, Month FROM ShiftSchedules WHERE PostName = @p ORDER BY Year ASC, Month ASC LIMIT 1";
+        schedCmd.Parameters.AddWithValue("@p", postName);
+        using var reader = schedCmd.ExecuteReader();
+        if (reader.Read())
+        {
+            return (reader.GetInt32(0), reader.GetInt32(1));
+        }
+
+        return (DateTime.Now.Year, DateTime.Now.Month);
+    }
+
+    /// <summary>
+    /// Задание базового месяца привязки дней заступления смены
+    /// </summary>
+    public void SetPostBaseMonth(string postName, int year, int month)
+    {
+        if (string.IsNullOrWhiteSpace(postName)) return;
+
+        string key = $"PostBaseMonth_{postName.Trim().ToLowerInvariant()}";
+        string val = $"{year:D4}-{month:D2}";
+        using var conn = new SqliteConnection(_connectionString);
+        conn.Open();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = @"
+            INSERT INTO AppSettings (Key, Value) VALUES (@k, @v)
+            ON CONFLICT(Key) DO UPDATE SET Value = @v";
+        cmd.Parameters.AddWithValue("@k", key);
+        cmd.Parameters.AddWithValue("@v", val);
+        cmd.ExecuteNonQuery();
+    }
+
     public List<ShiftSchedule> GetAllSchedulesForMonth(int year, int month)
     {
         var result = new List<ShiftSchedule>();

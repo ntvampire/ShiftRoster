@@ -152,6 +152,9 @@ public partial class SetupWizardDialog : Window
                 DatabaseService.Instance.SaveEmployee(emp);
             }
 
+            // Фиксируем базовый месяц привязки смены к текущему календарному месяцу
+            DatabaseService.Instance.SetPostBaseMonth(depName, DateTime.Now.Year, DateTime.Now.Month);
+
             if (string.IsNullOrEmpty(FirstCreatedPost))
             {
                 FirstCreatedPost = depName;

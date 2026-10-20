@@ -12,6 +12,8 @@ public partial class ManageEmployeesDialog : Window
 {
     private readonly List<Employee> _allEmployees = new();
     private Employee? _selectedEmployee;
+    private int _activeYear = DateTime.Now.Year;
+    private int _activeMonth = DateTime.Now.Month;
 
     public string CurrentSelectedPost { get; private set; } = string.Empty;
     public bool ShouldRecalculateSchedule => RecalculateScheduleCheckBox.IsChecked == true;
@@ -30,9 +32,12 @@ public partial class ManageEmployeesDialog : Window
         CloseButton.Click += (_, _) => Close(true);
     }
 
-    public void Initialize(string initialPost)
+    public void Initialize(string initialPost, int activeYear = 0, int activeMonth = 0)
     {
         CurrentSelectedPost = initialPost;
+        _activeYear = activeYear > 0 ? activeYear : DateTime.Now.Year;
+        _activeMonth = activeMonth > 0 ? activeMonth : DateTime.Now.Month;
+
         RefreshPosts();
         RefreshEmployees();
     }
@@ -148,6 +153,7 @@ public partial class ManageEmployeesDialog : Window
             _allEmployees.Insert(index - 1, item);
 
             DatabaseService.Instance.UpdateEmployeesOrder(_allEmployees);
+            DatabaseService.Instance.SetPostBaseMonth(CurrentSelectedPost, _activeYear, _activeMonth);
             RefreshEmployees();
             EmployeesListBox.SelectedIndex = index - 1;
         }
@@ -163,6 +169,7 @@ public partial class ManageEmployeesDialog : Window
             _allEmployees.Insert(index + 1, item);
 
             DatabaseService.Instance.UpdateEmployeesOrder(_allEmployees);
+            DatabaseService.Instance.SetPostBaseMonth(CurrentSelectedPost, _activeYear, _activeMonth);
             RefreshEmployees();
             EmployeesListBox.SelectedIndex = index + 1;
         }
@@ -204,6 +211,7 @@ public partial class ManageEmployeesDialog : Window
         emp.IsPermanent = true;
 
         DatabaseService.Instance.SaveEmployee(emp);
+        DatabaseService.Instance.SetPostBaseMonth(post, _activeYear, _activeMonth);
 
         RefreshEmployees();
 

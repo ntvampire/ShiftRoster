@@ -97,7 +97,7 @@ public partial class MainWindow : Window
 
             // Предлагаем сразу настроить штат этой смены
             var staffDialog = new ManageEmployeesDialog();
-            staffDialog.Initialize(dialog.CreatedPostName);
+            staffDialog.Initialize(dialog.CreatedPostName, vm.CurrentYear, vm.CurrentMonth);
             await staffDialog.ShowDialog<bool>(this);
 
             vm.RefreshPosts();
@@ -136,7 +136,7 @@ public partial class MainWindow : Window
         if (DataContext is not MainViewModel vm) return;
 
         var dialog = new ManageEmployeesDialog();
-        dialog.Initialize(vm.SelectedPost);
+        dialog.Initialize(vm.SelectedPost, vm.CurrentYear, vm.CurrentMonth);
 
         bool result = await dialog.ShowDialog<bool>(this);
         if (result)

@@ -68,26 +68,44 @@ public class RosterCalculationService
     /// Сдача смены на следующий день: 8 часов (2ч день + 6ч ночь с 00:00 до 06:00).
     /// Затем 2 дня отдыха (отсыпной и выходной).
     /// Итого в каждые сутки на посту дежурит 1 сдающий (8ч) + 1 заступающий (16ч) = ровно 24 часа!
+    /// Поддерживает сквозную непрерывность графика между месяцами относительно базового месяца (baseYear, baseMonth).
     /// </summary>
-    public List<RosterCell> AutoFillOneThree(int scheduleId, List<Employee> employees, int year, int month, int startShiftEmployeeIndex = 0)
+    public List<RosterCell> AutoFillOneThree(
+        int scheduleId, 
+        List<Employee> employees, 
+        int year, 
+        int month, 
+        int? baseYear = null, 
+        int? baseMonth = null, 
+        int startShiftEmployeeIndex = 0)
     {
         var cells = new List<RosterCell>();
         if (employees.Count == 0) return cells;
+
+        int bYear = baseYear ?? year;
+        int bMonth = baseMonth ?? month;
+        int daysInBaseMonth = DateTime.DaysInMonth(bYear, bMonth);
 
         int daysInMonth = DateTime.DaysInMonth(year, month);
         bool hasCustomStartDays = employees.Select(e => e.InitialShiftDay).Distinct().Count() == employees.Count;
 
         for (int day = 1; day <= daysInMonth; day++)
         {
+            var currentDate = new DateTime(year, month, day);
+
             for (int i = 0; i < employees.Count; i++)
             {
                 var emp = employees[i];
                 int startDay = hasCustomStartDays ? emp.InitialShiftDay : (startShiftEmployeeIndex + i + 1);
+                startDay = Math.Clamp(startDay, 1, daysInBaseMonth);
+
+                var empStartDate = new DateTime(bYear, bMonth, startDay);
+                int totalDaysOffset = (currentDate - empStartDate).Days;
 
                 // 0: заступление на смену (16ч)
                 // 1: сдача смены утром (8ч)
                 // 2, 3: выходные дни
-                int cycleDay = ((day - startDay) % 4 + 4) % 4;
+                int cycleDay = ((totalDaysOffset % 4) + 4) % 4;
 
                 string code = "В";
                 double dh = 0, nh = 0, th = 0;
@@ -127,28 +145,45 @@ public class RosterCalculationService
     }
 
     /// <summary>
-    /// Автозаполнение сетки для схемы «2 через 2» (по 12 часов: День / Ночь) с учетом стартового дня.
+    /// Автозаполнение сетки для схемы «2 через 2» (по 12 часов: День / Ночь) с учетом стартового дня и непрерывности.
     /// В каждые сутки задействовано 2 сотрудника (12ч день + 12ч ночь) = строго 24 часа на пост!
     /// </summary>
-    public List<RosterCell> AutoFillTwoTwo(int scheduleId, List<Employee> employees, int year, int month)
+    public List<RosterCell> AutoFillTwoTwo(
+        int scheduleId, 
+        List<Employee> employees, 
+        int year, 
+        int month, 
+        int? baseYear = null, 
+        int? baseMonth = null)
     {
         var cells = new List<RosterCell>();
         if (employees.Count < 4) return cells;
+
+        int bYear = baseYear ?? year;
+        int bMonth = baseMonth ?? month;
+        int daysInBaseMonth = DateTime.DaysInMonth(bYear, bMonth);
 
         int daysInMonth = DateTime.DaysInMonth(year, month);
 
         for (int day = 1; day <= daysInMonth; day++)
         {
+            var currentDate = new DateTime(year, month, day);
+
             for (int i = 0; i < employees.Count; i++)
             {
                 var emp = employees[i];
                 int startDay = emp.InitialShiftDay > 0 ? emp.InitialShiftDay : ((i % 2 == 0) ? 1 : 3);
+                startDay = Math.Clamp(startDay, 1, daysInBaseMonth);
+
+                var empStartDate = new DateTime(bYear, bMonth, startDay);
+                int totalDaysOffset = (currentDate - empStartDate).Days;
+
                 string pattern = emp.ShiftPattern ?? "2/2";
 
                 string code = "В";
                 double dh = 0, nh = 0, th = 0;
 
-                int cycleDay = ((day - startDay) % 4 + 4) % 4;
+                int cycleDay = ((totalDaysOffset % 4) + 4) % 4;
                 if (cycleDay is 0 or 1)
                 {
                     if (pattern.Contains("Ночь", StringComparison.OrdinalIgnoreCase) || i >= 2)

@@ -201,6 +201,64 @@ public static class VerificationTests
         }
         Console.WriteLine("[УСПЕХ] (Смена и ее данные полностью удалены без ошибок)");
 
+        // 10. Проверка непрерывности графика смен между месяцами (Октябрь -> Ноябрь)
+        Console.Write("10. Сквозная непрерывность смен между месяцами... ");
+        string contPost = "Пост Непрерывности";
+        var e1 = new Employee { FullName = "Работник 1", Position = "Оператор", PostName = contPost, InitialShiftDay = 1, SortOrder = 1 };
+        var e2 = new Employee { FullName = "Работник 2", Position = "Оператор", PostName = contPost, InitialShiftDay = 2, SortOrder = 2 };
+        var e3 = new Employee { FullName = "Работник 3", Position = "Оператор", PostName = contPost, InitialShiftDay = 3, SortOrder = 3 };
+        var e4 = new Employee { FullName = "Работник 4", Position = "Оператор", PostName = contPost, InitialShiftDay = 4, SortOrder = 4 };
+        db.SaveEmployee(e1);
+        db.SaveEmployee(e2);
+        db.SaveEmployee(e3);
+        db.SaveEmployee(e4);
+        var contEmps = db.GetEmployees(contPost);
+
+        // Базовый месяц: Октябрь 2026 (31 день)
+        db.SetPostBaseMonth(contPost, 2026, 10);
+        var octSched = db.GetOrCreateSchedule(2026, 10, contPost, "1/3");
+        var octCells = calc.AutoFillOneThree(octSched.Id, contEmps, 2026, 10, 2026, 10);
+
+        // 31 октября: Работник 3 заступил на 16ч, Работник 2 сдал 8ч
+        var oct31Emp3 = octCells.First(c => c.EmployeeName == "Работник 3" && c.DayOfMonth == 31);
+        var oct31Emp2 = octCells.First(c => c.EmployeeName == "Работник 2" && c.DayOfMonth == 31);
+        if (oct31Emp3.TotalHours != 16.0 || oct31Emp2.TotalHours != 8.0)
+        {
+            throw new Exception($"Неверное дежурство 31 октября: Р3={oct31Emp3.TotalHours}ч, Р2={oct31Emp2.TotalHours}ч");
+        }
+
+        // Следующий месяц: Ноябрь 2026 (30 дней) — график ДОЛЖЕН продолжаться, а не сбрасываться!
+        var novSched = db.GetOrCreateSchedule(2026, 11, contPost, "1/3");
+        var novCells = calc.AutoFillOneThree(novSched.Id, contEmps, 2026, 11, 2026, 10);
+
+        // 1 ноября: Работник 3 должен сдать смену (8ч), а Работник 4 — заступить на смену (16ч)!
+        var nov1Emp3 = novCells.First(c => c.EmployeeName == "Работник 3" && c.DayOfMonth == 1);
+        var nov1Emp4 = novCells.First(c => c.EmployeeName == "Работник 4" && c.DayOfMonth == 1);
+        var nov1Emp1 = novCells.First(c => c.EmployeeName == "Работник 1" && c.DayOfMonth == 1);
+
+        if (nov1Emp3.TotalHours != 8.0)
+        {
+            throw new Exception($"1 ноября Работник 3 должен был сдать смену (8ч), но у него {nov1Emp3.TotalHours}ч ({nov1Emp3.ShiftCode})!");
+        }
+        if (nov1Emp4.TotalHours != 16.0)
+        {
+            throw new Exception($"1 ноября Работник 4 должен был заступить на смену (16ч), но у него {nov1Emp4.TotalHours}ч ({nov1Emp4.ShiftCode})!");
+        }
+        if (nov1Emp1.TotalHours != 0.0)
+        {
+            throw new Exception($"1 ноября Работник 1 должен отдыхать, а не работать сначала!");
+        }
+
+        // Проверяем, что во все 30 дней ноября баланс строго 24.0 часа
+        var novValidation = calc.ValidatePostDailyBalance(novCells, 30);
+        if (novValidation.Any(v => !v.IsValid))
+        {
+            throw new Exception("Нарушен баланс 24ч в ноябре при непрерывном заполнении!");
+        }
+
+        db.DeletePost(contPost);
+        Console.WriteLine("[УСПЕХ] (Смена бесшовно переходит между месяцами: 31 окт [16ч/8ч] -> 1 ноя [8ч/16ч], норма 24ч)");
+
         Console.WriteLine("=================================================");
         Console.WriteLine("ВСЕ ТЕСТЫ И ТРЕБОВАНИЯ ТЗ УСПЕШНО ВЫПОЛНЕНЫ!");
         Console.WriteLine("=================================================");

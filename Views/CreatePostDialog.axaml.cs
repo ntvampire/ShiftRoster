@@ -57,6 +57,8 @@ public partial class CreatePostDialog : Window
             DatabaseService.Instance.SaveEmployee(emp);
         }
 
+        DatabaseService.Instance.SetPostBaseMonth(postName, DateTime.Now.Year, DateTime.Now.Month);
+
         CreatedPostName = postName;
         Close(true);
     }
