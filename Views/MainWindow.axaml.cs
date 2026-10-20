@@ -1,4 +1,5 @@
 using System;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -320,118 +321,44 @@ public partial class MainWindow : Window
         }
     }
 
-    public void OnCellPointerReleased(object? sender, PointerReleasedEventArgs e)
+    private void OnCellContextMenuOpening(object? sender, CancelEventArgs e)
     {
-        if (sender is not Button btn || btn.DataContext is not RosterCellViewModel cellVm || DataContext is not MainViewModel vm)
+        if (sender is not ContextMenu cm || DataContext is not MainViewModel vm)
             return;
 
-        if (e.InitialPressMouseButton == MouseButton.Right)
+        // Если контекстное меню открыто для ячейки, которая еще не выделена — выделяем ее
+        if (cm.PlacementTarget is Button btn && btn.DataContext is RosterCellViewModel cellVm)
         {
-            ShowCellContextMenu(btn, cellVm, vm);
-            e.Handled = true;
+            if (!vm.SelectedCells.Contains(cellVm))
+            {
+                vm.SelectCell(cellVm, isCtrlPressed: false, isShiftPressed: false);
+            }
+        }
+
+        // Динамически настраиваем видимость рабочих смен согласно выбранному режиму смены (1/3 или 2/2)
+        bool is22 = vm.CurrentPostPattern == "2/2";
+        foreach (var obj in cm.Items)
+        {
+            if (obj is MenuItem mi && mi.Tag is string tag)
+            {
+                if (tag is "16" or "8")
+                {
+                    mi.IsVisible = !is22;
+                }
+                else if (tag is "Д12" or "Н12")
+                {
+                    mi.IsVisible = is22;
+                }
+            }
         }
     }
 
-    public void OnCellContextRequested(object? sender, ContextRequestedEventArgs e)
+    private void OnMenuShiftClicked(object? sender, RoutedEventArgs e)
     {
-        if (sender is not Button btn || btn.DataContext is not RosterCellViewModel cellVm || DataContext is not MainViewModel vm)
-            return;
-
-        ShowCellContextMenu(btn, cellVm, vm);
-        e.Handled = true;
-    }
-
-    private void ShowCellContextMenu(Button btn, RosterCellViewModel cellVm, MainViewModel vm)
-    {
-        // Предотвращаем повторное открытие, если меню уже открыто для этой ячейки
-        if (btn.ContextMenu?.IsOpen == true)
-            return;
-
-        // Если ячейка еще не выделена, выделяем ее
-        if (!vm.SelectedCells.Contains(cellVm))
+        if (sender is MenuItem mi && mi.Tag is string shiftCode && DataContext is MainViewModel vm)
         {
-            vm.SelectCell(cellVm, isCtrlPressed: false, isShiftPressed: false);
+            vm.ApplyShift(shiftCode);
         }
-
-        var menu = new ContextMenu();
-        var items = new System.Collections.Generic.List<object>();
-
-        // 1. Фиксированные статусы отсутствия и отдыха
-        var itemSick = new MenuItem 
-        { 
-            Header = "🏥 Больничный лист (Б)",
-            InputGesture = new KeyGesture(Key.B)
-        };
-        itemSick.Click += (_, _) => vm.ApplyShift("Б");
-        items.Add(itemSick);
-
-        var itemVacation = new MenuItem 
-        { 
-            Header = "🏖️ Отпуск (О)",
-            InputGesture = new KeyGesture(Key.O)
-        };
-        itemVacation.Click += (_, _) => vm.ApplyShift("О");
-        items.Add(itemVacation);
-
-        var itemOff = new MenuItem 
-        { 
-            Header = "⚪ Выходной день (В)",
-            InputGesture = new KeyGesture(Key.Delete)
-        };
-        itemOff.Click += (_, _) => vm.ApplyShift("В");
-        items.Add(itemOff);
-
-        items.Add(new Separator());
-
-        // 2. Рабочие смены согласно выбранному режиму подразделения
-        if (vm.CurrentPostPattern == "2/2")
-        {
-            var itemDay12 = new MenuItem 
-            { 
-                Header = "☀️ 12ч Дневная смена (Д12)",
-                InputGesture = new KeyGesture(Key.D1)
-            };
-            itemDay12.Click += (_, _) => vm.ApplyShift("Д12");
-            items.Add(itemDay12);
-
-            var itemNight12 = new MenuItem 
-            { 
-                Header = "🌙 12ч Ночная смена (Н12)",
-                InputGesture = new KeyGesture(Key.D2)
-            };
-            itemNight12.Click += (_, _) => vm.ApplyShift("Н12");
-            items.Add(itemNight12);
-        }
-        else
-        {
-            var item16 = new MenuItem 
-            { 
-                Header = "⏱️ 16ч Заступление на смену",
-                InputGesture = new KeyGesture(Key.D1)
-            };
-            item16.Click += (_, _) => vm.ApplyShift("16");
-            items.Add(item16);
-
-            var item8 = new MenuItem 
-            { 
-                Header = "⏱️ 8ч Сдача смены утром",
-                InputGesture = new KeyGesture(Key.D8)
-            };
-            item8.Click += (_, _) => vm.ApplyShift("8");
-            items.Add(item8);
-        }
-
-        menu.ItemsSource = items;
-
-        // КРИТИЧЕСКИ ВАЖНО: при закрытии меню сбрасываем ContextMenu кнопки в null,
-        // чтобы Avalonia никогда не блокировала последующие вызовы меню на этой и любых других ячейках!
-        menu.Closed += (_, _) =>
-        {
-            btn.ContextMenu = null;
-        };
-
-        btn.ContextMenu = menu;
-        menu.Open(btn);
     }
 
     private async void OnAddNewPostClicked(object? sender, RoutedEventArgs e)

@@ -202,14 +202,6 @@
                             <Button Command="{Binding NextMonthCommand}" Content="▶" Width="30" Height="28" Padding="0" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" ToolTip.Tip="Следующий месяц" />
                         </StackPanel>
                     </Border>
-
-                    <!-- Правая часть: подсказка горячих клавиш -->
-                    <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center" Spacing="8">
-                        <Border Background="#2A2A2A" CornerRadius="4" Padding="8,4">
-                            <TextBlock Text="💡 Зажмите Shift для диапазона или Ctrl для выбора ячеек" 
-                                       Foreground="#888888" FontSize="11" />
-                        </Border>
-                    </StackPanel>
                 </Grid>
             </Border>
 
@@ -307,9 +299,19 @@
                                                                 BorderThickness="1"
                                                                 ToolTip.Tip="{Binding TooltipText}"
                                                                 Click="OnCellButtonClicked"
-                                                                PointerPressed="OnCellPointerPressed"
-                                                                PointerReleased="OnCellPointerReleased"
-                                                                ContextRequested="OnCellContextRequested">
+                                                                PointerPressed="OnCellPointerPressed">
+                                                            <Button.ContextMenu>
+                                                                <ContextMenu Opening="OnCellContextMenuOpening">
+                                                                    <MenuItem Header="🏥 Больничный лист (Б)" Click="OnMenuShiftClicked" Tag="Б" />
+                                                                    <MenuItem Header="🏖️ Отпуск (О)" Click="OnMenuShiftClicked" Tag="О" />
+                                                                    <MenuItem Header="⚪ Выходной день (В)" Click="OnMenuShiftClicked" Tag="В" />
+                                                                    <Separator />
+                                                                    <MenuItem Header="⏱️ 16ч (Заступление)" Click="OnMenuShiftClicked" Tag="16" />
+                                                                    <MenuItem Header="⏱️ 8ч (Сдача)" Click="OnMenuShiftClicked" Tag="8" />
+                                                                    <MenuItem Header="☀️ 12ч День (Д12)" Click="OnMenuShiftClicked" Tag="Д12" />
+                                                                    <MenuItem Header="🌙 12ч Ночь (Н12)" Click="OnMenuShiftClicked" Tag="Н12" />
+                                                                </ContextMenu>
+                                                            </Button.ContextMenu>
                                                             <TextBlock Text="{Binding DisplayText}" 
                                                                        FontWeight="SemiBold" FontSize="12" 
                                                                        Foreground="White"
@@ -373,34 +375,42 @@
                 </ScrollViewer>
             </Border>
 
-            <!-- НИЖНЯЯ ПАНЕЛЬ: ПОДСКАЗКИ И СТРОКА СОСТОЯНИЯ -->
-            <Border Grid.Row="3" Background="#1E1E1E" BorderBrush="#333333" BorderThickness="0,1,0,0" Padding="14,8">
+            <!-- НИЖНЯЯ ПАНЕЛЬ: ЕДИНЫЙ БЛОК ПОДСКАЗОК И СТРОКА СОСТОЯНИЯ -->
+            <Border Grid.Row="3" Background="#1C1C1C" BorderBrush="#333333" BorderThickness="0,1,0,0" Padding="12,7">
                 <Grid ColumnDefinitions="Auto,*,Auto">
                     
-                    <!-- Подсказки горячих клавиш и контекстного меню -->
-                    <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                        <TextBlock Text="⌨️ Быстрый ввод:" VerticalAlignment="Center" Foreground="#888888" FontSize="12" />
+                    <!-- Единый блок подсказок по выделению, контекстному меню и быстрым клавишам -->
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                        <TextBlock Text="💡 Управление:" VerticalAlignment="Center" Foreground="#888888" FontSize="11" Margin="0,0,2,0" />
 
-                        <Border Background="#2A2A2A" CornerRadius="4" Padding="6,2" ToolTip.Tip="Кликните правой кнопкой мыши по любой ячейке или выделенному диапазону дней">
-                            <TextBlock Text="ПКМ — меню смены" FontSize="11" Foreground="#84BAE8" FontWeight="SemiBold" />
+                        <Border Background="#262626" CornerRadius="4" Padding="6,2" ToolTip.Tip="Кликните первую ячейку, затем зажмите Shift и кликните вторую для выделения диапазона дней">
+                            <TextBlock Text="Shift+Клик — диапазон" FontSize="11" Foreground="#E0E0E0" />
                         </Border>
 
-                        <Border Background="#2A2A2A" CornerRadius="4" Padding="6,2" ToolTip.Tip="Нажмите 'Б' на клавиатуре для назначения больничного">
+                        <Border Background="#262626" CornerRadius="4" Padding="6,2" ToolTip.Tip="Зажмите Ctrl и кликайте ячейки для выбора нескольких отдельных дней">
+                            <TextBlock Text="Ctrl+Клик — выбор ячеек" FontSize="11" Foreground="#AAAAAA" />
+                        </Border>
+
+                        <Border Background="#262626" CornerRadius="4" Padding="6,2" ToolTip.Tip="Кликните правой кнопкой мыши по любой ячейке или выделенному диапазону дней для выбора смены из меню">
+                            <TextBlock Text="ПКМ — меню смен" FontSize="11" Foreground="#84BAE8" FontWeight="SemiBold" />
+                        </Border>
+
+                        <Border Background="#262626" CornerRadius="4" Padding="6,2" ToolTip.Tip="Нажмите 'Б' на клавиатуре для назначения больничного листа">
                             <TextBlock Text="Б — больничный" FontSize="11" Foreground="#F5C070" FontWeight="SemiBold" />
                         </Border>
 
-                        <Border Background="#2A2A2A" CornerRadius="4" Padding="6,2" ToolTip.Tip="Нажмите 'О' на клавиатуре для назначения отпуска">
+                        <Border Background="#262626" CornerRadius="4" Padding="6,2" ToolTip.Tip="Нажмите 'О' на клавиатуре для назначения отпуска">
                             <TextBlock Text="О — отпуск" FontSize="11" Foreground="#84E1A7" FontWeight="SemiBold" />
                         </Border>
 
-                        <Border Background="#2A2A2A" CornerRadius="4" Padding="6,2" ToolTip.Tip="Нажмите 'В' или 'Delete' на клавиатуре для назначения выходного">
+                        <Border Background="#262626" CornerRadius="4" Padding="6,2" ToolTip.Tip="Нажмите 'В' или 'Delete' на клавиатуре для назначения выходного">
                             <TextBlock Text="В / Del — выходной" FontSize="11" Foreground="#CCCCCC" FontWeight="SemiBold" />
                         </Border>
                     </StackPanel>
 
                     <!-- Статусное сообщение -->
                     <TextBlock Grid.Column="2" Text="{Binding StatusMessage}" 
-                               Foreground="#AAAAAA" FontSize="12" VerticalAlignment="Center" 
+                               Foreground="#BBBBBB" FontSize="12" VerticalAlignment="Center" 
                                HorizontalAlignment="Right" />
                 </Grid>
             </Border>
