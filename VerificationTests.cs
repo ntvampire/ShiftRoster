@@ -612,6 +612,58 @@ public static class VerificationTests
         db.DeletePost(orderPost);
         Console.WriteLine("[УСПЕХ] (Сотрудники и подменные строго сохраняют порядок создания и назначения во всех отчетах)");
 
+        // 17. Проверка общего справочника подменных сотрудников (CRUD и уникальность)
+        Console.Write("17. Справочник подменных сотрудников (добавление, редактирование, удаление)... ");
+        string testSubName1 = "Смирнов А.А. (Тест)";
+        string testSubName2 = "Ковалев Б.Б. (Тест)";
+
+        // Очищаем, если остались от предыдущих тестов
+        var existingSub1 = db.GetSubstitutes().FirstOrDefault(s => s.FullName == testSubName1);
+        if (existingSub1 != null) db.DeleteSubstitute(existingSub1.Id);
+        var existingSub2 = db.GetSubstitutes().FirstOrDefault(s => s.FullName == testSubName2);
+        if (existingSub2 != null) db.DeleteSubstitute(existingSub2.Id);
+
+        // Добавление
+        db.SaveSubstitute(testSubName1, "Оператор (подмена)");
+        db.SaveSubstitute(testSubName2, "Старший смены");
+
+        var subsList = db.GetSubstitutes();
+        var subRecord1 = subsList.FirstOrDefault(s => s.FullName == testSubName1);
+        var subRecord2 = subsList.FirstOrDefault(s => s.FullName == testSubName2);
+
+        if (subRecord1 == null || subRecord2 == null)
+        {
+            throw new Exception("Подменные сотрудники не добавились в базу данных!");
+        }
+
+        // Проверка уникальности
+        if (!db.SubstituteExists(testSubName1))
+        {
+            throw new Exception("SubstituteExists не нашел добавленного сотрудника!");
+        }
+
+        // Редактирование
+        string testSubName1Updated = "Смирнов А.А. (Обновлен)";
+        db.UpdateSubstitute(subRecord1.Id, testSubName1, testSubName1Updated, "Дежурный оператор");
+
+        var updatedRecord = db.GetSubstitutes().FirstOrDefault(s => s.Id == subRecord1.Id);
+        if (updatedRecord == null || updatedRecord.FullName != testSubName1Updated || updatedRecord.Position != "Дежурный оператор")
+        {
+            throw new Exception("Данные подменного не обновились при вызове UpdateSubstitute!");
+        }
+
+        // Удаление
+        db.DeleteSubstitute(subRecord1.Id);
+        db.DeleteSubstitute(subRecord2.Id);
+
+        var subsAfterDelete = db.GetSubstitutes();
+        if (subsAfterDelete.Any(s => s.FullName == testSubName1Updated || s.FullName == testSubName2))
+        {
+            throw new Exception("Подменный сотрудник не был удален из базы данных!");
+        }
+
+        Console.WriteLine("[УСПЕХ] (Справочник подменных: добавление, изменение, удаление и проверка уникальности работают без сбоев)");
+
         Console.WriteLine("=================================================");
         Console.WriteLine("ВСЕ ТЕСТЫ И ТРЕБОВАНИЯ ТЗ УСПЕШНО ВЫПОЛНЕНЫ!");
         Console.WriteLine("=================================================");

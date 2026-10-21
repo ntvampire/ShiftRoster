@@ -843,6 +843,65 @@ public class DatabaseService
         SaveSubstitute(fullName, "Оператор (подмена)");
     }
 
+    public void UpdateSubstitute(int id, string oldFullName, string newFullName, string newPosition)
+    {
+        string cleanNewName = newFullName.Trim();
+        string cleanNewPos = string.IsNullOrWhiteSpace(newPosition) ? "Оператор (подмена)" : newPosition.Trim();
+
+        using var conn = CreateOpenConnection();
+        using var tx = conn.BeginTransaction();
+
+        using var cmd = conn.CreateCommand();
+        cmd.Transaction = tx;
+        cmd.CommandText = @"
+            UPDATE SubstituteNames 
+            SET FullName = @newName, Position = @newPos, LastUsedAt = @now
+            WHERE Id = @id";
+        cmd.Parameters.AddWithValue("@newName", cleanNewName);
+        cmd.Parameters.AddWithValue("@newPos", cleanNewPos);
+        cmd.Parameters.AddWithValue("@now", DateTime.Now.ToString("o"));
+        cmd.Parameters.AddWithValue("@id", id);
+        cmd.ExecuteNonQuery();
+
+        if (!string.IsNullOrWhiteSpace(oldFullName) && !oldFullName.Equals(cleanNewName, StringComparison.OrdinalIgnoreCase))
+        {
+            using var cellCmd = conn.CreateCommand();
+            cellCmd.Transaction = tx;
+            cellCmd.CommandText = @"
+                UPDATE RosterCells 
+                SET EmployeeName = @newName, Position = @newPos 
+                WHERE EmployeeName = @oldName AND IsSubstitute = 1";
+            cellCmd.Parameters.AddWithValue("@newName", cleanNewName);
+            cellCmd.Parameters.AddWithValue("@newPos", cleanNewPos);
+            cellCmd.Parameters.AddWithValue("@oldName", oldFullName.Trim());
+            cellCmd.ExecuteNonQuery();
+        }
+
+        tx.Commit();
+    }
+
+    public void DeleteSubstitute(int id)
+    {
+        using var conn = CreateOpenConnection();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = "DELETE FROM SubstituteNames WHERE Id = @id";
+        cmd.Parameters.AddWithValue("@id", id);
+        cmd.ExecuteNonQuery();
+    }
+
+    public bool SubstituteExists(string fullName, int excludeId = 0)
+    {
+        if (string.IsNullOrWhiteSpace(fullName)) return false;
+
+        using var conn = CreateOpenConnection();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = "SELECT COUNT(*) FROM SubstituteNames WHERE LOWER(FullName) = LOWER(@name) AND Id != @exId";
+        cmd.Parameters.AddWithValue("@name", fullName.Trim());
+        cmd.Parameters.AddWithValue("@exId", excludeId);
+        var count = Convert.ToInt32(cmd.ExecuteScalar() ?? 0);
+        return count > 0;
+    }
+
     // --- Праздничные дни календаря ---
     public List<RussianCalendarDay> GetHolidays(int year)
     {

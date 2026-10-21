@@ -1,0 +1,107 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="ShiftRoster.Views.ManageSubstitutesDialog"
+        Title="База подменных сотрудников"
+        Width="780" Height="540"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource AppWindowBackgroundBrush}">
+
+    <Grid RowDefinitions="Auto,*,Auto" Margin="18">
+
+        <!-- ВЕРХ: ЗАГОЛОВОК И СЧЕТЧИК -->
+        <Border Grid.Row="0" Background="{DynamicResource AppCardSecondaryBackgroundBrush}" CornerRadius="6" Padding="12" Margin="0,0,0,14" BorderBrush="{DynamicResource AppBorderBrush}" BorderThickness="1">
+            <Grid ColumnDefinitions="Auto,*,Auto">
+                <TextBlock Grid.Column="0" Text="📋" FontSize="20" VerticalAlignment="Center" Margin="0,0,10,0" />
+                <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
+                    <TextBlock Text="База подменных сотрудников (общая для всех смен)" FontWeight="Bold" FontSize="13" Foreground="{DynamicResource AppTextPrimaryBrush}" />
+                    <TextBlock Text="Справочник используется при назначении замен на периоды отпусков и больничных." FontSize="11" Foreground="{DynamicResource AppTextTertiaryBrush}" />
+                </StackPanel>
+                <Border Grid.Column="2" Background="{DynamicResource AppBadgeBackgroundBrush}" CornerRadius="4" Padding="10,6" VerticalAlignment="Center">
+                    <TextBlock x:Name="TotalSubstitutesBadgeText" Text="Всего: 0 чел." FontSize="12" FontWeight="SemiBold" Foreground="#0078D4" />
+                </Border>
+            </Grid>
+        </Border>
+
+        <!-- ЦЕНТР: СПИСОК ПОДМЕННЫХ И КАРТОЧКА РЕДАКТИРОВАНИЯ -->
+        <Grid Grid.Row="1" ColumnDefinitions="*,16,330">
+
+            <!-- Левая колонка: Поиск и список подменных -->
+            <Border Grid.Column="0" Background="{DynamicResource AppCardBackgroundBrush}" CornerRadius="6" BorderBrush="{DynamicResource AppBorderBrush}" BorderThickness="1" Padding="10">
+                <Grid RowDefinitions="Auto,*,Auto">
+                    <!-- Поле быстрого поиска -->
+                    <TextBox Grid.Row="0" x:Name="SearchTextBox" Watermark="🔍 Быстрый поиск по ФИО или должности..." Height="32" Margin="0,0,0,8" />
+
+                    <!-- Список подменных сотрудников -->
+                    <ListBox Grid.Row="1" x:Name="SubstitutesListBox" Background="Transparent">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Border Padding="8,6" Margin="0,2" Background="{DynamicResource AppCardSecondaryBackgroundBrush}" CornerRadius="4">
+                                    <Grid ColumnDefinitions="*,Auto">
+                                        <StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="2">
+                                            <TextBlock Text="{Binding FullName}" FontWeight="SemiBold" Foreground="{DynamicResource AppTextPrimaryBrush}" FontSize="13" />
+                                            <TextBlock Text="{Binding Position}" Foreground="{DynamicResource AppTextTertiaryBrush}" FontSize="11" />
+                                        </StackPanel>
+                                        <Border Grid.Column="1" Background="{DynamicResource AppBadgeBackgroundBrush}" CornerRadius="4" Padding="8,3" VerticalAlignment="Center">
+                                            <TextBlock Text="Подмена" FontSize="11" FontWeight="SemiBold" Foreground="#0078D4" />
+                                        </Border>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+
+                    <TextBlock Grid.Row="2" Text="* Выберите сотрудника для редактирования или нажмите «Добавить как нового»." Foreground="{DynamicResource AppTextTertiaryBrush}" FontSize="11" Margin="2,8,2,0" />
+                </Grid>
+            </Border>
+
+            <!-- Правая колонка: Карточка редактирования -->
+            <Border Grid.Column="2" Background="{DynamicResource AppCardBackgroundBrush}" CornerRadius="6" BorderBrush="{DynamicResource AppBorderBrush}" BorderThickness="1" Padding="14">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Spacing="12">
+                        <TextBlock x:Name="EditorTitleText" Text="Карточка подменного" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimaryBrush}" FontSize="14" />
+
+                        <!-- ФИО -->
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="ФИО подменного сотрудника:" Foreground="{DynamicResource AppTextSecondaryBrush}" FontSize="12" />
+                            <TextBox x:Name="FullNameTextBox" Watermark="Например: Сидоров С.С." Height="34" />
+                        </StackPanel>
+
+                        <!-- Должность -->
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="Должность:" Foreground="{DynamicResource AppTextSecondaryBrush}" FontSize="12" />
+                            <TextBox x:Name="PositionTextBox" Watermark="Оператор (подмена)" Height="34" />
+                            
+                            <!-- Быстрые шаблоны должностей -->
+                            <TextBlock Text="Быстрый выбор:" Foreground="{DynamicResource AppTextTertiaryBrush}" FontSize="10" Margin="0,2,0,0" />
+                            <WrapPanel Margin="0,2,0,0">
+                                <Button x:Name="PosChipOperator" Content="Оператор (подмена)" FontSize="10" Padding="6,2" Height="22" Margin="0,0,4,4" Background="{DynamicResource AppCardSecondaryBackgroundBrush}" />
+                                <Button x:Name="PosChipDuty" Content="Дежурный оператор" FontSize="10" Padding="6,2" Height="22" Margin="0,0,4,4" Background="{DynamicResource AppCardSecondaryBackgroundBrush}" />
+                                <Button x:Name="PosChipSenior" Content="Старший смены" FontSize="10" Padding="6,2" Height="22" Margin="0,0,4,4" Background="{DynamicResource AppCardSecondaryBackgroundBrush}" />
+                                <Button x:Name="PosChipSecurity" Content="Охранник" FontSize="10" Padding="6,2" Height="22" Margin="0,0,4,4" Background="{DynamicResource AppCardSecondaryBackgroundBrush}" />
+                            </WrapPanel>
+                        </StackPanel>
+
+                        <!-- Сообщение валидации/ошибки -->
+                        <TextBlock x:Name="ValidationMessageText" Text="" Foreground="#C5221F" FontSize="11" TextWrapping="Wrap" IsVisible="False" />
+
+                        <!-- Кнопки управления карточкой -->
+                        <StackPanel Spacing="8" Margin="0,8,0,0">
+                            <Button x:Name="SaveButton" Content="💾 Сохранить изменения" Classes="accent" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Height="34" />
+                            <Button x:Name="AddClearButton" Content="➕ Добавить как нового" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Height="34" />
+                            <Button x:Name="DeleteButton" Content="🗑️ Удалить из базы" Background="{DynamicResource AppDeleteButtonBackgroundBrush}" Foreground="{DynamicResource AppDeleteButtonForegroundBrush}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Height="34" />
+                        </StackPanel>
+                    </StackPanel>
+                </ScrollViewer>
+            </Border>
+        </Grid>
+
+        <!-- НИЗ: СТАТУС И ЗАКРЫТИЕ -->
+        <Border Grid.Row="2" Margin="0,14,0,0" Padding="0,12,0,0" BorderBrush="{DynamicResource AppBorderBrush}" BorderThickness="0,1,0,0">
+            <Grid ColumnDefinitions="*,Auto">
+                <TextBlock Grid.Column="0" x:Name="StatusMessageText" Text="База подменных сотрудников актуальна." Foreground="{DynamicResource AppTextTertiaryBrush}" FontSize="12" VerticalAlignment="Center" />
+                <Button Grid.Column="1" x:Name="CloseButton" Content="✅ Закрыть" Width="140" Height="36" Classes="accent" HorizontalContentAlignment="Center" />
+            </Grid>
+        </Border>
+
+    </Grid>
+</Window>

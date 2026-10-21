@@ -113,6 +113,13 @@
                                 <TextBlock Text="Назначить подмену" VerticalAlignment="Center" FontSize="12" />
                             </StackPanel>
                         </Button>
+
+                        <Button x:Name="ManageSubstitutesSidebarButton" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Height="34" ToolTip.Tip="Справочник и управление всеми подменными работниками организации">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <TextBlock Text="📋" FontSize="14" />
+                                <TextBlock Text="База подменных..." VerticalAlignment="Center" FontSize="12" />
+                            </StackPanel>
+                        </Button>
                     </StackPanel>
 
                     <Separator Background="{DynamicResource AppBorderBrush}" Height="1" Margin="0,2" />

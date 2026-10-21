@@ -26,6 +26,7 @@ public partial class MainWindow : Window
         SetupWizardSidebarButton.Click += OnSetupWizardClicked;
         AssignAbsencePeriodSidebarButton.Click += OnAssignAbsencePeriodClicked;
         AssignSubstituteSidebarButton.Click += OnAssignSubstituteClicked;
+        ManageSubstitutesSidebarButton.Click += OnManageSubstitutesClicked;
         ExportExcelSidebarButton.Click += OnExportExcelClicked;
         ExportConsolidatedSidebarButton.Click += OnExportConsolidatedClicked;
 
@@ -570,6 +571,21 @@ public partial class MainWindow : Window
                 dialog.StartDay,
                 dialog.EndDay,
                 dialog.ReasonCode);
+        }
+    }
+
+    private async void OnManageSubstitutesClicked(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainViewModel vm) return;
+
+        var dialog = new ManageSubstitutesDialog();
+        dialog.Initialize();
+
+        bool result = await dialog.ShowDialog<bool>(this);
+        if (result)
+        {
+            vm.LoadMonth(vm.CurrentYear, vm.CurrentMonth);
+            vm.StatusMessage = "База подменных сотрудников обновлена.";
         }
     }
 
