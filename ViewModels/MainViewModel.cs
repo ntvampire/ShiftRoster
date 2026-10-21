@@ -798,9 +798,9 @@ public partial class MainViewModel : ViewModelBase
             targetFilePath = Path.Combine(exportDir, $"График_Смен_{safePostName}_{CurrentMonthName}_{CurrentYear}.xlsx");
         }
 
-        ExcelExportService.Instance.ExportRosterToExcel(targetFilePath, _currentSchedule, allCells, summaries);
-        StatusMessage = $"Табель смены «{CurrentPostName}» экспортирован в Excel: {Path.GetFileName(targetFilePath)}";
-        return targetFilePath;
+        string actualPath = ExcelExportService.Instance.ExportRosterToExcel(targetFilePath, _currentSchedule, allCells, summaries);
+        StatusMessage = $"Табель смены «{CurrentPostName}» экспортирован в Excel: {Path.GetFileName(actualPath)}";
+        return actualPath;
     }
 
     /// <summary>
@@ -808,6 +808,8 @@ public partial class MainViewModel : ViewModelBase
     /// </summary>
     public string ExportConsolidatedExcel(string? targetFilePath = null)
     {
+        SaveRoster();
+
         var postDataList = new List<(ShiftSchedule Schedule, List<RosterCell> Cells, List<EmployeeMonthSummary> Summaries)>();
         var allPosts = DatabaseService.Instance.GetAllPostNames();
 
@@ -849,9 +851,9 @@ public partial class MainViewModel : ViewModelBase
             targetFilePath = Path.Combine(exportDir, $"Сводный_График_Смен_Все_Смены_{CurrentMonthName}_{CurrentYear}.xlsx");
         }
 
-        ExcelExportService.Instance.ExportConsolidatedRosterToExcel(targetFilePath, CurrentYear, CurrentMonth, postDataList);
-        StatusMessage = $"Сводный отчет по всем {allPosts.Count} подразделениям экспортирован: {Path.GetFileName(targetFilePath)}";
-        return targetFilePath;
+        string actualPath = ExcelExportService.Instance.ExportConsolidatedRosterToExcel(targetFilePath, CurrentYear, CurrentMonth, postDataList);
+        StatusMessage = $"Сводный отчет по всем {allPosts.Count} подразделениям экспортирован: {Path.GetFileName(actualPath)}";
+        return actualPath;
     }
 
     [RelayCommand]

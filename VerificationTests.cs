@@ -141,6 +141,10 @@ public static class VerificationTests
         string consolidatedExcel = Path.Combine(exportDir, "Test_Сводный_График_Все_Смены.xlsx");
         ExcelExportService.Instance.ExportConsolidatedRosterToExcel(consolidatedExcel, testYear, testMonth, postDataList);
 
+        // Также проверяем реальный метод MainViewModel.ExportConsolidatedExcel()
+        var testVm = new ShiftRoster.ViewModels.MainViewModel();
+        testVm.ExportConsolidatedExcel();
+
         if (!File.Exists(consolidatedExcel))
         {
             throw new Exception($"Файл сводного отчета не найден: {consolidatedExcel}");
@@ -151,7 +155,48 @@ public static class VerificationTests
         {
             throw new Exception($"Размер сводного файла мал: {fiConsolidated.Length} байт");
         }
-        Console.WriteLine($"[УСПЕХ] (Сводный отчет по {posts.Count} сменам сформирован: {fiConsolidated.Length} байт)");
+
+        // Детальная проверка требований к отчетам (ClosedXML)
+        using (var wb = new ClosedXML.Excel.XLWorkbook(consolidatedExcel))
+        {
+            var wsSummary = wb.Worksheet(1);
+            if (wsSummary.PageSetup.PageOrientation != ClosedXML.Excel.XLPageOrientation.Landscape ||
+                wsSummary.PageSetup.PaperSize != ClosedXML.Excel.XLPaperSize.A4Paper)
+            {
+                throw new Exception("Лист сводки не настроен на А4 альбомную ориентацию!");
+            }
+
+            // Проверка отсутствия столбца «Статус»
+            for (int col = 1; col <= 10; col++)
+            {
+                string headerVal = wsSummary.Cell(6, col).GetString();
+                if (headerVal.Contains("Статус"))
+                {
+                    throw new Exception("Столбец «Статус» обнаружен в сводной ведомости!");
+                }
+            }
+
+            // Проверка бланка Т-13: пробел перед скобкой должности и 31-й день
+            var wsT13 = wb.Worksheet("Сводный бланк Т-13");
+            if (wsT13.PageSetup.PageOrientation != ClosedXML.Excel.XLPageOrientation.Landscape)
+            {
+                throw new Exception("Бланк Т-13 не настроен на альбомную ориентацию!");
+            }
+
+            string day31Header = wsT13.Cell(7, 18).GetString();
+            if (day31Header != "31")
+            {
+                throw new Exception($"Колонка 18 в бланке Т-13 должна содержать '31', но получено '{day31Header}'!");
+            }
+
+            string empCell = wsT13.Cell(8, 2).GetString();
+            if (!empCell.Contains(" ("))
+            {
+                throw new Exception($"В бланке Т-13 отсутствует пробел перед должностью в скобках: '{empCell}'");
+            }
+        }
+
+        Console.WriteLine($"[УСПЕХ] (Сводный отчет по {posts.Count} сменам сформирован: без 'Статус', пробел 'ФИО (Должность)', 31-й день, А4 альбомная печать)");
 
         // 7. Проверка наименования организации в базе и отчетах
         Console.Write("7. Название организации в базе и отчетах... ");
