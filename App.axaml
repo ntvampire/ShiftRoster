@@ -3,11 +3,83 @@
              xmlns:local="using:ShiftRoster"
              xmlns:sty="using:FluentAvalonia.Styling"
              x:Class="ShiftRoster.App"
-             RequestedThemeVariant="Dark">
+             RequestedThemeVariant="Default">
 
     <Application.DataTemplates>
         <local:ViewLocator />
     </Application.DataTemplates>
+
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.ThemeDictionaries>
+                <!-- Светлая тема оформления (чистая, мягкая, высококонтрастная) -->
+                <ResourceDictionary x:Key="Light">
+                    <SolidColorBrush x:Key="AppWindowBackgroundBrush" Color="#F3F3F3" />
+                    <SolidColorBrush x:Key="AppSidebarBackgroundBrush" Color="#F8F8F8" />
+                    <SolidColorBrush x:Key="AppCardBackgroundBrush" Color="#FFFFFF" />
+                    <SolidColorBrush x:Key="AppCardSecondaryBackgroundBrush" Color="#F5F5F5" />
+                    <SolidColorBrush x:Key="AppHeaderBackgroundBrush" Color="#F0F0F0" />
+                    <SolidColorBrush x:Key="AppBorderBrush" Color="#E0E0E0" />
+                    <SolidColorBrush x:Key="AppBorderStrongBrush" Color="#CCCCCC" />
+                    <SolidColorBrush x:Key="AppTextPrimaryBrush" Color="#1F1F1F" />
+                    <SolidColorBrush x:Key="AppTextSecondaryBrush" Color="#555555" />
+                    <SolidColorBrush x:Key="AppTextTertiaryBrush" Color="#777777" />
+                    <SolidColorBrush x:Key="AppBadgeBackgroundBrush" Color="#EAEAEA" />
+                    <SolidColorBrush x:Key="AppRowBorderBrush" Color="#EEEEEE" />
+                    <SolidColorBrush x:Key="AppTableHeaderBackgroundBrush" Color="#F5F5F5" />
+                    <SolidColorBrush x:Key="AppSummaryRowBackgroundBrush" Color="#EAEAEA" />
+                    <SolidColorBrush x:Key="AppHintBadgeBackgroundBrush" Color="#EBEBEB" />
+                    <SolidColorBrush x:Key="AppHintBadgeForegroundBrush" Color="#222222" />
+                    <SolidColorBrush x:Key="AppDeleteButtonBackgroundBrush" Color="#FDE8E8" />
+                    <SolidColorBrush x:Key="AppDeleteButtonForegroundBrush" Color="#C5221F" />
+                </ResourceDictionary>
+
+                <!-- Тёмная тема оформления (глубокий WinUI 3 стиль) -->
+                <ResourceDictionary x:Key="Dark">
+                    <SolidColorBrush x:Key="AppWindowBackgroundBrush" Color="#181818" />
+                    <SolidColorBrush x:Key="AppSidebarBackgroundBrush" Color="#202020" />
+                    <SolidColorBrush x:Key="AppCardBackgroundBrush" Color="#222222" />
+                    <SolidColorBrush x:Key="AppCardSecondaryBackgroundBrush" Color="#282828" />
+                    <SolidColorBrush x:Key="AppHeaderBackgroundBrush" Color="#222222" />
+                    <SolidColorBrush x:Key="AppBorderBrush" Color="#333333" />
+                    <SolidColorBrush x:Key="AppBorderStrongBrush" Color="#383838" />
+                    <SolidColorBrush x:Key="AppTextPrimaryBrush" Color="#FFFFFF" />
+                    <SolidColorBrush x:Key="AppTextSecondaryBrush" Color="#CCCCCC" />
+                    <SolidColorBrush x:Key="AppTextTertiaryBrush" Color="#888888" />
+                    <SolidColorBrush x:Key="AppBadgeBackgroundBrush" Color="#2A2A2A" />
+                    <SolidColorBrush x:Key="AppRowBorderBrush" Color="#303030" />
+                    <SolidColorBrush x:Key="AppTableHeaderBackgroundBrush" Color="#2A2A2A" />
+                    <SolidColorBrush x:Key="AppSummaryRowBackgroundBrush" Color="#252525" />
+                    <SolidColorBrush x:Key="AppHintBadgeBackgroundBrush" Color="#262626" />
+                    <SolidColorBrush x:Key="AppHintBadgeForegroundBrush" Color="#E0E0E0" />
+                    <SolidColorBrush x:Key="AppDeleteButtonBackgroundBrush" Color="#4A1E1E" />
+                    <SolidColorBrush x:Key="AppDeleteButtonForegroundBrush" Color="#FF9999" />
+                </ResourceDictionary>
+
+                <!-- Резервный дефолт (совпадает с Dark) -->
+                <ResourceDictionary x:Key="Default">
+                    <SolidColorBrush x:Key="AppWindowBackgroundBrush" Color="#181818" />
+                    <SolidColorBrush x:Key="AppSidebarBackgroundBrush" Color="#202020" />
+                    <SolidColorBrush x:Key="AppCardBackgroundBrush" Color="#222222" />
+                    <SolidColorBrush x:Key="AppCardSecondaryBackgroundBrush" Color="#282828" />
+                    <SolidColorBrush x:Key="AppHeaderBackgroundBrush" Color="#222222" />
+                    <SolidColorBrush x:Key="AppBorderBrush" Color="#333333" />
+                    <SolidColorBrush x:Key="AppBorderStrongBrush" Color="#383838" />
+                    <SolidColorBrush x:Key="AppTextPrimaryBrush" Color="#FFFFFF" />
+                    <SolidColorBrush x:Key="AppTextSecondaryBrush" Color="#CCCCCC" />
+                    <SolidColorBrush x:Key="AppTextTertiaryBrush" Color="#888888" />
+                    <SolidColorBrush x:Key="AppBadgeBackgroundBrush" Color="#2A2A2A" />
+                    <SolidColorBrush x:Key="AppRowBorderBrush" Color="#303030" />
+                    <SolidColorBrush x:Key="AppTableHeaderBackgroundBrush" Color="#2A2A2A" />
+                    <SolidColorBrush x:Key="AppSummaryRowBackgroundBrush" Color="#252525" />
+                    <SolidColorBrush x:Key="AppHintBadgeBackgroundBrush" Color="#262626" />
+                    <SolidColorBrush x:Key="AppHintBadgeForegroundBrush" Color="#E0E0E0" />
+                    <SolidColorBrush x:Key="AppDeleteButtonBackgroundBrush" Color="#4A1E1E" />
+                    <SolidColorBrush x:Key="AppDeleteButtonForegroundBrush" Color="#FF9999" />
+                </ResourceDictionary>
+            </ResourceDictionary.ThemeDictionaries>
+        </ResourceDictionary>
+    </Application.Resources>
 
     <Application.Styles>
         <sty:FluentAvaloniaTheme PreferUserAccentColor="True" />

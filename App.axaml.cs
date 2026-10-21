@@ -3,6 +3,7 @@ using System.IO;
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
+using ShiftRoster.Services;
 using ShiftRoster.ViewModels;
 using ShiftRoster.Views;
 
@@ -23,6 +24,8 @@ public partial class App : Application
             }
             catch { }
         };
+
+        ThemeService.Instance.Initialize();
     }
 
     public override void OnFrameworkInitializationCompleted()

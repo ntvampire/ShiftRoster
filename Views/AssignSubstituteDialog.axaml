@@ -6,7 +6,7 @@
         SizeToContent="Height"
         CanResize="True"
         WindowStartupLocation="CenterOwner"
-        Background="#202020">
+        Background="{DynamicResource AppWindowBackgroundBrush}">
 
     <Grid RowDefinitions="*,Auto" Margin="20">
         
@@ -20,30 +20,30 @@
                     </Border>
                     <StackPanel VerticalAlignment="Center">
                         <TextBlock Text="Назначить подменного работника" 
-                                   FontSize="16" FontWeight="SemiBold" Foreground="White" />
+                                   FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource AppTextPrimaryBrush}" />
                         <TextBlock Text="Замещение дежурств на время отпуска или болезни с сохранением нормы 24ч" 
-                                   FontSize="12" Foreground="#888888" />
+                                   FontSize="12" Foreground="{DynamicResource AppTextTertiaryBrush}" />
                     </StackPanel>
                 </StackPanel>
 
                 <!-- БЛОК ВЫБОРА ИЗ УЖЕ ОФОРМЛЕННЫХ ОТПУСКОВ / БОЛЬНИЧНЫХ -->
-                <Border x:Name="ExistingAbsencesBorder" Background="#282828" CornerRadius="6" Padding="12" BorderBrush="#383838" BorderThickness="1">
+                <Border x:Name="ExistingAbsencesBorder" Background="{DynamicResource AppCardSecondaryBackgroundBrush}" CornerRadius="6" Padding="12" BorderBrush="{DynamicResource AppBorderBrush}" BorderThickness="1">
                     <StackPanel Spacing="6">
-                        <TextBlock Text="📋 Выберите оформленный отпуск / больничный в этом месяце:" FontWeight="SemiBold" Foreground="#84BAE8" FontSize="12" />
+                        <TextBlock Text="📋 Выберите оформленный отпуск / больничный в этом месяце:" FontWeight="SemiBold" Foreground="#0078D4" FontSize="12" />
                         <ComboBox x:Name="ExistingAbsencesComboBox" HorizontalAlignment="Stretch" Height="34" />
-                        <TextBlock Text="* При выборе периода данные основного сотрудника и даты подставятся автоматически." Foreground="#777777" FontSize="11" />
+                        <TextBlock Text="* При выборе периода данные основного сотрудника и даты подставятся автоматически." Foreground="{DynamicResource AppTextTertiaryBrush}" FontSize="11" />
                     </StackPanel>
                 </Border>
 
                 <!-- Выбор основного сотрудника -->
                 <StackPanel Spacing="4">
-                    <TextBlock Text="Основной сотрудник:" Foreground="#CCCCCC" FontSize="13" />
+                    <TextBlock Text="Основной сотрудник:" Foreground="{DynamicResource AppTextSecondaryBrush}" FontSize="13" />
                     <ComboBox x:Name="MainEmployeeComboBox" HorizontalAlignment="Stretch" Height="34" />
                 </StackPanel>
 
                 <!-- Причина отсутствия -->
                 <StackPanel Spacing="4">
-                    <TextBlock Text="Причина отсутствия:" Foreground="#CCCCCC" FontSize="13" />
+                    <TextBlock Text="Причина отсутствия:" Foreground="{DynamicResource AppTextSecondaryBrush}" FontSize="13" />
                     <ComboBox x:Name="ReasonComboBox" HorizontalAlignment="Stretch" SelectedIndex="0" Height="34">
                         <ComboBoxItem Content="🏖️ Отпуск (О)" Tag="О" />
                         <ComboBoxItem Content="🏥 Больничный лист (Б)" Tag="Б" />
@@ -53,50 +53,50 @@
                 <!-- Период отсутствия -->
                 <Grid ColumnDefinitions="*,16,*">
                     <StackPanel Grid.Column="0" Spacing="4">
-                        <TextBlock Text="С какого числа (день):" Foreground="#CCCCCC" FontSize="13" />
+                        <TextBlock Text="С какого числа (день):" Foreground="{DynamicResource AppTextSecondaryBrush}" FontSize="13" />
                         <NumericUpDown x:Name="StartDayNumeric" Minimum="1" Maximum="31" Value="1" Height="34" FormatString="0" />
                     </StackPanel>
                     <StackPanel Grid.Column="2" Spacing="4">
-                        <TextBlock Text="По какое число (день):" Foreground="#CCCCCC" FontSize="13" />
+                        <TextBlock Text="По какое число (день):" Foreground="{DynamicResource AppTextSecondaryBrush}" FontSize="13" />
                         <NumericUpDown x:Name="EndDayNumeric" Minimum="1" Maximum="31" Value="14" Height="34" FormatString="0" />
                     </StackPanel>
                 </Grid>
 
                 <!-- ПЛАШКА ИНФОРМАЦИИ О ПЕРЕНОСИМЫХ СМЕНАХ -->
-                <Border x:Name="ShiftTransferInfoBorder" Background="#1B3A28" CornerRadius="6" Padding="10" BorderBrush="#2E6B44" BorderThickness="1">
+                <Border x:Name="ShiftTransferInfoBorder" Background="{DynamicResource AppCardSecondaryBackgroundBrush}" CornerRadius="6" Padding="10" BorderBrush="{DynamicResource AppBorderBrush}" BorderThickness="1">
                     <StackPanel Orientation="Horizontal" Spacing="8">
                         <TextBlock Text="ℹ️" FontSize="16" VerticalAlignment="Center" />
                         <TextBlock x:Name="ShiftTransferInfoText" 
                                    Text="Плановые дежурства основного сотрудника будут автоматически перенесены на подменного." 
-                                   Foreground="#A3E4BE" FontSize="12" TextWrapping="Wrap" VerticalAlignment="Center" />
+                                   Foreground="#0078D4" FontSize="12" TextWrapping="Wrap" VerticalAlignment="Center" />
                     </StackPanel>
                 </Border>
 
                 <!-- ФИО подменного сотрудника (выбор из сохраненных или ввод нового) -->
                 <StackPanel Spacing="4">
-                    <TextBlock Text="ФИО подменного работника:" Foreground="#CCCCCC" FontSize="13" />
+                    <TextBlock Text="ФИО подменного работника:" Foreground="{DynamicResource AppTextSecondaryBrush}" FontSize="13" />
                     <AutoCompleteBox x:Name="SubstituteNameBox" 
                                      Height="34" 
                                      Watermark="Например: Смирнов В.А." 
                                      FilterMode="ContainsOrdinal" />
                     <TextBlock Text="* Выберите из ранее использованных или введите новое ФИО"
-                               Foreground="#777777" FontSize="11" />
+                               Foreground="{DynamicResource AppTextTertiaryBrush}" FontSize="11" />
                 </StackPanel>
 
                 <!-- Должность подменного сотрудника -->
                 <StackPanel Spacing="4">
-                    <TextBlock Text="Должность подменного работника:" Foreground="#CCCCCC" FontSize="13" />
+                    <TextBlock Text="Должность подменного работника:" Foreground="{DynamicResource AppTextSecondaryBrush}" FontSize="13" />
                     <TextBox x:Name="SubstitutePositionTextBox" 
                              Height="34" 
                              Watermark="Например: Оператор (подмена)" />
                     <TextBlock Text="* Должность сохраняется в базе и подставляется при последующих назначениях"
-                               Foreground="#777777" FontSize="11" />
+                               Foreground="{DynamicResource AppTextTertiaryBrush}" FontSize="11" />
                 </StackPanel>
             </StackPanel>
         </ScrollViewer>
 
         <!-- КНОПКИ ДЕЙСТВИЙ (ФИКСИРОВАНЫ ВНИЗУ, НИКОГДА НЕ СРЕЗАЮТСЯ) -->
-        <Border Grid.Row="1" Margin="0,16,0,0" Padding="0,14,0,0" BorderBrush="#333333" BorderThickness="0,1,0,0">
+        <Border Grid.Row="1" Margin="0,16,0,0" Padding="0,14,0,0" BorderBrush="{DynamicResource AppBorderBrush}" BorderThickness="0,1,0,0">
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="12">
                 <Button x:Name="CancelButton" Content="Пропустить (без подмены)" Width="200" Height="36" />
                 <Button x:Name="ApplyButton" Content="Назначить подменного" Width="190" Height="36" Classes="accent" />

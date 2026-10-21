@@ -41,7 +41,14 @@ public partial class EmployeeRosterRowViewModel : ObservableObject
     private int _sickDays;
 
     public string DisplayBadge => IsSubstitute ? $"🔄 Подмена (за {SubstitutedForName})" : "Штатный";
-    public string BadgeColor => IsSubstitute ? "#D89B00" : "#505050";
+    public string BadgeColor => IsSubstitute 
+        ? (ThemeService.Instance.IsDarkMode ? "#D89B00" : "#B87500") 
+        : (ThemeService.Instance.IsDarkMode ? "#505050" : "#707070");
+
+    public void RefreshTheme()
+    {
+        OnPropertyChanged(nameof(BadgeColor));
+    }
 
     public EmployeeRosterRowViewModel(string employeeName, string position, bool isSubstitute, string? substitutedForName)
     {

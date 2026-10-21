@@ -5,19 +5,19 @@
         Width="820" Height="600"
         CanResize="False"
         WindowStartupLocation="CenterOwner"
-        Background="#1E1E1E">
+        Background="{DynamicResource AppWindowBackgroundBrush}">
 
     <Grid RowDefinitions="Auto,*,Auto" Margin="24">
 
         <!-- ЗАГОЛОВОК МАСТЕРА -->
-        <Border Grid.Row="0" Margin="0,0,0,16" Padding="0,0,0,12" BorderBrush="#333333" BorderThickness="0,0,0,1">
+        <Border Grid.Row="0" Margin="0,0,0,16" Padding="0,0,0,12" BorderBrush="{DynamicResource AppBorderBrush}" BorderThickness="0,0,0,1">
             <Grid ColumnDefinitions="Auto,*">
                 <Border Grid.Column="0" Background="#0078D4" CornerRadius="8" Width="40" Height="40" Margin="0,0,14,0">
                     <TextBlock Text="🧙" FontSize="22" HorizontalAlignment="Center" VerticalAlignment="Center" />
                 </Border>
                 <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                    <TextBlock Text="Мастер быстрой настройки графика смен" FontSize="18" FontWeight="Bold" Foreground="White" />
-                    <TextBlock x:Name="StepSubtitleText" Text="Шаг 1 из 3: Название подразделения и схема работы" FontSize="12" Foreground="#888888" />
+                    <TextBlock Text="Мастер быстрой настройки графика смен" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimaryBrush}" />
+                    <TextBlock x:Name="StepSubtitleText" Text="Шаг 1 из 3: Название подразделения и схема работы" FontSize="12" Foreground="{DynamicResource AppTextTertiaryBrush}" />
                 </StackPanel>
             </Grid>
         </Border>
@@ -27,35 +27,35 @@
 
             <!-- ШАГ 1: ПОДРАЗДЕЛЕНИЕ И ГРАФИК -->
             <StackPanel x:Name="Step1Panel" Spacing="16" IsVisible="True" VerticalAlignment="Center">
-                <Border Background="#252525" CornerRadius="8" Padding="20" BorderBrush="#383838" BorderThickness="1">
+                <Border Background="{DynamicResource AppCardBackgroundBrush}" CornerRadius="8" Padding="20" BorderBrush="{DynamicResource AppBorderBrush}" BorderThickness="1">
                     <StackPanel Spacing="16">
-                        <TextBlock Text="1. Параметры организации и подразделения" FontWeight="SemiBold" FontSize="15" Foreground="White" />
+                        <TextBlock Text="1. Параметры организации и подразделения" FontWeight="SemiBold" FontSize="15" Foreground="{DynamicResource AppTextPrimaryBrush}" />
 
                         <!-- Название организации (самое первое поле) -->
                         <StackPanel Spacing="6">
                             <TextBlock Text="Название организации (предприятия):" FontWeight="Bold" Foreground="#0078D4" FontSize="13" />
                             <TextBox x:Name="OrganizationNameBox" Watermark="Например: ООО «Северные Энергосети», МУП «Водоканал»..." FontSize="14" Height="36" />
                             <TextBlock Text="* Обязательно указывается в шапках официального бланка Т-13 и сводных ведомостях для 1С." 
-                                       Foreground="#777777" FontSize="11" />
+                                       Foreground="{DynamicResource AppTextTertiaryBrush}" FontSize="11" />
                         </StackPanel>
 
                         <!-- Название подразделения -->
                         <StackPanel Spacing="6">
-                            <TextBlock Text="Название подразделения / смены / поста:" Foreground="#CCCCCC" FontSize="13" />
+                            <TextBlock Text="Название подразделения / смены / поста:" Foreground="{DynamicResource AppTextSecondaryBrush}" FontSize="13" />
                             <TextBox x:Name="DepartmentNameBox" Watermark="Например: Котельная, Диспетчерская, Охрана КПП-1..." FontSize="14" Height="36" />
                             <TextBlock Text="* Это название будет отображаться в табеле, отчетах 1С и унифицированной форме Т-13." 
-                                       Foreground="#777777" FontSize="11" />
+                                       Foreground="{DynamicResource AppTextTertiaryBrush}" FontSize="11" />
                         </StackPanel>
 
                         <!-- Схема работы -->
                         <StackPanel Spacing="6">
-                            <TextBlock Text="Схема сменного графика:" Foreground="#CCCCCC" FontSize="13" />
+                            <TextBlock Text="Схема сменного графика:" Foreground="{DynamicResource AppTextSecondaryBrush}" FontSize="13" />
                             <ComboBox x:Name="ScheduleTypeComboBox" HorizontalAlignment="Stretch" SelectedIndex="0" Height="36">
                                 <ComboBoxItem Content="Сутки через трое (1/3) — 16ч в день заступления / 8ч на след. день" Tag="1/3" />
                                 <ComboBoxItem Content="2 через 2 — по 12 часов (День / Ночь)" Tag="2/2" />
                             </ComboBox>
                             <TextBlock Text="* При схеме 1/3 в каждые сутки на посту ровно 24 часа (8ч сдача смены + 16ч заступление)." 
-                                       Foreground="#777777" FontSize="11" />
+                                       Foreground="{DynamicResource AppTextTertiaryBrush}" FontSize="11" />
                         </StackPanel>
                     </StackPanel>
                 </Border>
@@ -65,18 +65,18 @@
             <Grid x:Name="Step2Panel" RowDefinitions="Auto,*,Auto" IsVisible="False">
                 <Border Grid.Row="0" Margin="0,0,0,10">
                     <Grid ColumnDefinitions="*,Auto">
-                        <TextBlock x:Name="Step2TitleText" Text="Работники подразделения и стартовые дни смен:" FontWeight="SemiBold" Foreground="White" FontSize="14" VerticalAlignment="Center" />
+                        <TextBlock x:Name="Step2TitleText" Text="Работники подразделения и стартовые дни смен:" FontWeight="SemiBold" Foreground="{DynamicResource AppTextPrimaryBrush}" FontSize="14" VerticalAlignment="Center" />
                         <Button Grid.Column="1" x:Name="AddEmployeeRowButton" Content="➕ Добавить работника" />
                     </Grid>
                 </Border>
 
                 <!-- Список строк сотрудников -->
-                <Border Grid.Row="1" Background="#252525" CornerRadius="6" BorderBrush="#383838" BorderThickness="1" Padding="8">
+                <Border Grid.Row="1" Background="{DynamicResource AppCardBackgroundBrush}" CornerRadius="6" BorderBrush="{DynamicResource AppBorderBrush}" BorderThickness="1" Padding="8">
                     <ScrollViewer VerticalScrollBarVisibility="Auto">
                         <ItemsControl x:Name="WizardEmployeesItemsControl">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
-                                    <Border Padding="6,4" Margin="0,2" Background="#2B2B2B" CornerRadius="4">
+                                    <Border Padding="6,4" Margin="0,2" Background="{DynamicResource AppCardSecondaryBackgroundBrush}" CornerRadius="4">
                                         <Grid ColumnDefinitions="2*,1.5*,Auto,Auto">
                                             <!-- ФИО -->
                                             <TextBox Grid.Column="0" Text="{Binding FullName, Mode=TwoWay}" 
@@ -88,7 +88,7 @@
 
                                             <!-- Стартовый день -->
                                             <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="4,0,12,0">
-                                                <TextBlock Text="День старта:" Foreground="#CCCCCC" FontSize="12" VerticalAlignment="Center" Margin="0,0,6,0" />
+                                                <TextBlock Text="День старта:" Foreground="{DynamicResource AppTextSecondaryBrush}" FontSize="12" VerticalAlignment="Center" Margin="0,0,6,0" />
                                                 <NumericUpDown Value="{Binding InitialShiftDay, Mode=TwoWay}" 
                                                                Minimum="1" Maximum="31" Width="110" Height="32" 
                                                                FormatString="0" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" />
@@ -97,7 +97,9 @@
                                             <!-- Кнопка удаления -->
                                             <Button Grid.Column="3" Content="✕" Width="30" Height="30" Padding="0" 
                                                     HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
-                                                    Click="OnDeleteEmployeeRowClicked" Tag="{Binding}" Background="#4A1E1E" Foreground="White" />
+                                                    Click="OnDeleteEmployeeRowClicked" Tag="{Binding}" 
+                                                    Background="{DynamicResource AppDeleteButtonBackgroundBrush}" 
+                                                    Foreground="{DynamicResource AppDeleteButtonForegroundBrush}" />
                                         </Grid>
                                     </Border>
                                 </DataTemplate>
@@ -107,27 +109,27 @@
                 </Border>
 
                 <TextBlock Grid.Row="2" Text="* Укажите день первой смены каждого работника в месяце. Для суток/трое: 1, 2, 3, 4." 
-                           Foreground="#888888" FontSize="11" Margin="0,8,0,0" />
+                           Foreground="{DynamicResource AppTextTertiaryBrush}" FontSize="11" Margin="0,8,0,0" />
             </Grid>
 
             <!-- ШАГ 3: ПРЕДЛОЖЕНИЕ ДОБАВИТЬ ЕЩЕ ПОДРАЗДЕЛЕНИЕ -->
             <StackPanel x:Name="Step3Panel" Spacing="16" IsVisible="False" VerticalAlignment="Center">
-                <Border Background="#252525" CornerRadius="8" Padding="24" BorderBrush="#383838" BorderThickness="1">
+                <Border Background="{DynamicResource AppCardBackgroundBrush}" CornerRadius="8" Padding="24" BorderBrush="{DynamicResource AppBorderBrush}" BorderThickness="1">
                     <StackPanel Spacing="16" HorizontalAlignment="Center">
                         <Border Background="#107C41" CornerRadius="24" Width="48" Height="48" HorizontalAlignment="Center">
                             <TextBlock Text="✔" FontSize="24" FontWeight="Bold" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Border>
 
                         <TextBlock x:Name="SuccessMessageText" Text="Подразделение успешно настроено!" 
-                                   FontWeight="Bold" FontSize="16" Foreground="White" HorizontalAlignment="Center" />
+                                   FontWeight="Bold" FontSize="16" Foreground="{DynamicResource AppTextPrimaryBrush}" HorizontalAlignment="Center" />
 
-                        <TextBlock Text="Уже настроенные подразделения:" Foreground="#AAAAAA" FontSize="12" HorizontalAlignment="Center" />
-                        <Border Background="#1E1E1E" CornerRadius="6" Padding="12" MinWidth="350">
+                        <TextBlock Text="Уже настроенные подразделения:" Foreground="{DynamicResource AppTextTertiaryBrush}" FontSize="12" HorizontalAlignment="Center" />
+                        <Border Background="{DynamicResource AppCardSecondaryBackgroundBrush}" CornerRadius="6" Padding="12" MinWidth="350">
                             <TextBlock x:Name="ConfiguredPostsListText" Text="—" Foreground="#0078D4" FontWeight="SemiBold" FontSize="13" TextAlignment="Center" />
                         </Border>
 
                         <TextBlock Text="Хотите добавить еще одно подразделение (смену, пост, участок)?" 
-                                   Foreground="#CCCCCC" FontSize="13" HorizontalAlignment="Center" />
+                                   Foreground="{DynamicResource AppTextSecondaryBrush}" FontSize="13" HorizontalAlignment="Center" />
 
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="16" Margin="0,8,0,0">
                             <Button x:Name="AddAnotherPostButton" Content="➕ Добавить еще подразделение" Padding="16,8" />
@@ -140,7 +142,7 @@
         </Grid>
 
         <!-- НИЖНЯЯ ПАНЕЛЬ НАВИГАЦИИ ПО ШАГАМ -->
-        <Border Grid.Row="2" Margin="0,16,0,0" Padding="0,12,0,0" BorderBrush="#333333" BorderThickness="0,1,0,0">
+        <Border Grid.Row="2" Margin="0,16,0,0" Padding="0,12,0,0" BorderBrush="{DynamicResource AppBorderBrush}" BorderThickness="0,1,0,0">
             <Grid ColumnDefinitions="Auto,*,Auto">
                 <Button Grid.Column="0" x:Name="BackButton" Content="⬅ Назад" Width="100" IsVisible="False" />
                 <Button Grid.Column="2" x:Name="NextButton" Content="Далее ➔" Width="120" Classes="accent" />

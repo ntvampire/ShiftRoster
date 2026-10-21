@@ -70,6 +70,23 @@ public partial class MainViewModel : ViewModelBase
     private string _statusMessage = "Готово к работе";
 
     [ObservableProperty]
+    private int _selectedThemeIndex = 0; // 0: Auto, 1: Dark, 2: Light
+
+    partial void OnSelectedThemeIndexChanged(int value)
+    {
+        var targetMode = value switch
+        {
+            1 => AppThemeMode.Dark,
+            2 => AppThemeMode.Light,
+            _ => AppThemeMode.Auto
+        };
+        if (ThemeService.Instance.CurrentMode != targetMode)
+        {
+            ThemeService.Instance.CurrentMode = targetMode;
+        }
+    }
+
+    [ObservableProperty]
     private bool _isSidebarOpen = true;
 
     [ObservableProperty]
@@ -98,7 +115,49 @@ public partial class MainViewModel : ViewModelBase
             _currentPostName = string.Empty;
             ShouldRunWizardOnStartup = true;
         }
+        _selectedThemeIndex = ThemeService.Instance.CurrentMode switch
+        {
+            AppThemeMode.Dark => 1,
+            AppThemeMode.Light => 2,
+            _ => 0
+        };
+
+        ThemeService.Instance.ThemeChanged += OnThemeChanged;
+
         LoadMonth(CurrentYear, CurrentMonth);
+    }
+
+    private void OnThemeChanged()
+    {
+        int expectedIndex = ThemeService.Instance.CurrentMode switch
+        {
+            AppThemeMode.Dark => 1,
+            AppThemeMode.Light => 2,
+            _ => 0
+        };
+        if (SelectedThemeIndex != expectedIndex)
+        {
+            SelectedThemeIndex = expectedIndex;
+        }
+
+        foreach (var row in Rows)
+        {
+            row.RefreshTheme();
+            foreach (var cell in row.DayCells)
+            {
+                cell.RefreshTheme();
+            }
+        }
+
+        foreach (var header in DayHeaders)
+        {
+            header.RefreshTheme();
+        }
+
+        foreach (var balance in DayBalances)
+        {
+            balance.RefreshTheme();
+        }
     }
 
     public void RefreshPosts()

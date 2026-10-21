@@ -438,6 +438,57 @@ public static class VerificationTests
 
         Console.WriteLine("[УСПЕХ] (FAMenuFlyout открывается стабильно без ошибок)");
 
+        // 15. Проверка переключения тем (Авто / Тёмная / Светлая) и эргономичной палитры читаемости
+        Console.Write("15. Переключение тем (Авто/Тёмная/Светлая) и контрастность ячеек... ");
+        var themeService = ThemeService.Instance;
+
+        // Тестируем режим Светлой темы
+        themeService.CurrentMode = AppThemeMode.Light;
+        if (db.GetThemeMode() != "Light")
+        {
+            throw new Exception("Светлая тема не сохранилась в базе данных AppSettings!");
+        }
+
+        var cellLight = new ShiftRoster.ViewModels.RosterCellViewModel(new ShiftRoster.Models.RosterCell { DayOfMonth = 1, ShiftCode = "16", TotalHours = 16, DayHours = 14, NightHours = 2 }, 2026, 10);
+        if (cellLight.CellBackground != "#E3F2FD" || cellLight.CellForeground != "#0D47A1")
+        {
+            throw new Exception($"Некорректная светлая палитра 16ч: фон={cellLight.CellBackground}, текст={cellLight.CellForeground}");
+        }
+
+        cellLight.ShiftCode = "О";
+        if (cellLight.CellBackground != "#D4EDDA" || cellLight.CellForeground != "#155724")
+        {
+            throw new Exception($"Некорректная светлая палитра Отпуска: фон={cellLight.CellBackground}, текст={cellLight.CellForeground}");
+        }
+
+        cellLight.ShiftCode = "Б";
+        if (cellLight.CellBackground != "#FFE8D1" || cellLight.CellForeground != "#8F3900")
+        {
+            throw new Exception($"Некорректная светлая палитра Больничного: фон={cellLight.CellBackground}, текст={cellLight.CellForeground}");
+        }
+
+        // Тестируем режим Тёмной темы
+        themeService.CurrentMode = AppThemeMode.Dark;
+        if (db.GetThemeMode() != "Dark")
+        {
+            throw new Exception("Тёмная тема не сохранилась в базе данных AppSettings!");
+        }
+
+        var cellDark = new ShiftRoster.ViewModels.RosterCellViewModel(new ShiftRoster.Models.RosterCell { DayOfMonth = 1, ShiftCode = "16", TotalHours = 16, DayHours = 14, NightHours = 2 }, 2026, 10);
+        if (cellDark.CellBackground != "#1F3B5C" || cellDark.CellForeground != "#FFFFFF")
+        {
+            throw new Exception($"Некорректная тёмная палитра 16ч: фон={cellDark.CellBackground}, текст={cellDark.CellForeground}");
+        }
+
+        // Возвращаем режим Авто (системная тема)
+        themeService.CurrentMode = AppThemeMode.Auto;
+        if (db.GetThemeMode() != "Auto")
+        {
+            throw new Exception("Режим 'Авто' не сохранился в базе данных!");
+        }
+
+        Console.WriteLine("[УСПЕХ] (Светлая и тёмная темы, эргономика контраста и сохранение в БД работают безупречно)");
+
         Console.WriteLine("=================================================");
         Console.WriteLine("ВСЕ ТЕСТЫ И ТРЕБОВАНИЯ ТЗ УСПЕШНО ВЫПОЛНЕНЫ!");
         Console.WriteLine("=================================================");

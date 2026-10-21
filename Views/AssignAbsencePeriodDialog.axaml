@@ -6,7 +6,7 @@
         SizeToContent="Height"
         CanResize="False"
         WindowStartupLocation="CenterOwner"
-        Background="#202020">
+        Background="{DynamicResource AppWindowBackgroundBrush}">
 
     <Grid RowDefinitions="*,Auto" Margin="22">
         <StackPanel Grid.Row="0" Spacing="16">
@@ -15,20 +15,20 @@
                     <TextBlock Text="📅" FontSize="18" HorizontalAlignment="Center" VerticalAlignment="Center" />
                 </Border>
                 <StackPanel VerticalAlignment="Center">
-                    <TextBlock Text="Назначить период (отпуск, больничный, выходной)" FontSize="15" FontWeight="SemiBold" Foreground="White" />
-                    <TextBlock Text="Массовое заполнение диапазона дней для выбранного сотрудника" FontSize="12" Foreground="#888888" />
+                    <TextBlock Text="Назначить период (отпуск, больничный, выходной)" FontSize="15" FontWeight="SemiBold" Foreground="{DynamicResource AppTextPrimaryBrush}" />
+                    <TextBlock Text="Массовое заполнение диапазона дней для выбранного сотрудника" FontSize="12" Foreground="{DynamicResource AppTextTertiaryBrush}" />
                 </StackPanel>
             </StackPanel>
 
             <!-- Выбор сотрудника -->
             <StackPanel Spacing="6">
-                <TextBlock Text="Сотрудник:" Foreground="#CCCCCC" FontSize="13" />
+                <TextBlock Text="Сотрудник:" Foreground="{DynamicResource AppTextSecondaryBrush}" FontSize="13" />
                 <ComboBox x:Name="EmployeeComboBox" HorizontalAlignment="Stretch" Height="36" />
             </StackPanel>
 
             <!-- Статус отсутствия / тип смены -->
             <StackPanel Spacing="6">
-                <TextBlock Text="Статус или тип смены на период:" Foreground="#CCCCCC" FontSize="13" />
+                <TextBlock Text="Статус или тип смены на период:" Foreground="{DynamicResource AppTextSecondaryBrush}" FontSize="13" />
                 <ComboBox x:Name="StatusTypeComboBox" HorizontalAlignment="Stretch" SelectedIndex="0" Height="36">
                     <ComboBoxItem Content="🏖️ Отпуск (О) — 0 часов" Tag="О" />
                     <ComboBoxItem Content="🏥 Больничный лист (Б) — 0 часов" Tag="Б" />
@@ -43,18 +43,18 @@
             <!-- Диапазон дат -->
             <Grid ColumnDefinitions="*,16,*">
                 <StackPanel Grid.Column="0" Spacing="6">
-                    <TextBlock Text="С какого числа (день):" Foreground="#CCCCCC" FontSize="13" />
+                    <TextBlock Text="С какого числа (день):" Foreground="{DynamicResource AppTextSecondaryBrush}" FontSize="13" />
                     <NumericUpDown x:Name="StartDayNumeric" Minimum="1" Maximum="31" Value="1" Height="34" FormatString="0" />
                 </StackPanel>
                 <StackPanel Grid.Column="2" Spacing="6">
-                    <TextBlock Text="По какое число (день):" Foreground="#CCCCCC" FontSize="13" />
+                    <TextBlock Text="По какое число (день):" Foreground="{DynamicResource AppTextSecondaryBrush}" FontSize="13" />
                     <NumericUpDown x:Name="EndDayNumeric" Minimum="1" Maximum="31" Value="14" Height="34" FormatString="0" />
                 </StackPanel>
             </Grid>
         </StackPanel>
 
         <!-- Кнопки внизу -->
-        <Border Grid.Row="1" Margin="0,20,0,0" Padding="0,14,0,0" BorderBrush="#333333" BorderThickness="0,1,0,0">
+        <Border Grid.Row="1" Margin="0,20,0,0" Padding="0,14,0,0" BorderBrush="{DynamicResource AppBorderBrush}" BorderThickness="0,1,0,0">
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="12">
                 <Button x:Name="CancelButton" Content="Отмена" Width="100" Height="34" />
                 <Button x:Name="ApplyButton" Content="Применить период" Width="160" Height="34" Classes="accent" />

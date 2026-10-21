@@ -385,6 +385,28 @@ public class DatabaseService
         cmd.ExecuteNonQuery();
     }
 
+    public string GetThemeMode()
+    {
+        using var conn = new SqliteConnection(_connectionString);
+        conn.Open();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = "SELECT Value FROM AppSettings WHERE Key = 'ThemeMode' LIMIT 1";
+        var val = cmd.ExecuteScalar() as string;
+        return string.IsNullOrWhiteSpace(val) ? "Auto" : val;
+    }
+
+    public void SetThemeMode(string mode)
+    {
+        using var conn = new SqliteConnection(_connectionString);
+        conn.Open();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = @"
+            INSERT INTO AppSettings (Key, Value) VALUES ('ThemeMode', @val)
+            ON CONFLICT(Key) DO UPDATE SET Value = @val";
+        cmd.Parameters.AddWithValue("@val", mode);
+        cmd.ExecuteNonQuery();
+    }
+
     /// <summary>
     /// Получение базового месяца, к которому привязаны стартовые дни сотрудников смены
     /// </summary>

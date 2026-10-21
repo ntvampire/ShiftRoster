@@ -6,7 +6,7 @@
         SizeToContent="Height"
         CanResize="False"
         WindowStartupLocation="CenterOwner"
-        Background="#202020">
+        Background="{DynamicResource AppWindowBackgroundBrush}">
 
     <Grid RowDefinitions="*,Auto" Margin="22">
         <StackPanel Grid.Row="0" Spacing="16">
@@ -15,20 +15,20 @@
                     <TextBlock Text="➕" FontSize="18" HorizontalAlignment="Center" VerticalAlignment="Center" />
                 </Border>
                 <StackPanel VerticalAlignment="Center">
-                    <TextBlock Text="Новое подразделение / смена" FontSize="16" FontWeight="SemiBold" Foreground="White" />
-                    <TextBlock Text="Задайте название и график работы для нового поста" FontSize="12" Foreground="#888888" />
+                    <TextBlock Text="Новое подразделение / смена" FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource AppTextPrimaryBrush}" />
+                    <TextBlock Text="Задайте название и график работы для нового поста" FontSize="12" Foreground="{DynamicResource AppTextTertiaryBrush}" />
                 </StackPanel>
             </StackPanel>
 
             <!-- Название подразделения -->
             <StackPanel Spacing="6">
-                <TextBlock Text="Название подразделения / поста:" Foreground="#CCCCCC" FontSize="13" />
+                <TextBlock Text="Название подразделения / поста:" Foreground="{DynamicResource AppTextSecondaryBrush}" FontSize="13" />
                 <TextBox x:Name="PostNameTextBox" Watermark="Например: Охрана КПП-2, Котельная №2..." Height="36" FontSize="13" />
             </StackPanel>
 
             <!-- Схема сменного графика (задается на уровне подразделения!) -->
             <StackPanel Spacing="6">
-                <TextBlock Text="Схема сменного графика подразделения:" Foreground="#CCCCCC" FontSize="13" />
+                <TextBlock Text="Схема сменного графика подразделения:" Foreground="{DynamicResource AppTextSecondaryBrush}" FontSize="13" />
                 <ComboBox x:Name="PatternComboBox" HorizontalAlignment="Stretch" SelectedIndex="0" Height="36">
                     <ComboBoxItem Content="Сутки через трое (1/3) — 16ч заступление / 8ч сдача" Tag="1/3" />
                     <ComboBoxItem Content="2 через 2 — по 12 часов (День / Ночь)" Tag="2/2" />
@@ -37,13 +37,13 @@
 
             <!-- Количество сотрудников по умолчанию -->
             <StackPanel Spacing="6">
-                <TextBlock Text="Количество работников по умолчанию:" Foreground="#CCCCCC" FontSize="13" />
+                <TextBlock Text="Количество работников по умолчанию:" Foreground="{DynamicResource AppTextSecondaryBrush}" FontSize="13" />
                 <NumericUpDown x:Name="EmployeeCountNumeric" Minimum="1" Maximum="20" Value="4" Height="34" Width="120" HorizontalAlignment="Left" FormatString="0" />
             </StackPanel>
         </StackPanel>
 
         <!-- Кнопки внизу -->
-        <Border Grid.Row="1" Margin="0,20,0,0" Padding="0,14,0,0" BorderBrush="#333333" BorderThickness="0,1,0,0">
+        <Border Grid.Row="1" Margin="0,20,0,0" Padding="0,14,0,0" BorderBrush="{DynamicResource AppBorderBrush}" BorderThickness="0,1,0,0">
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="12">
                 <Button x:Name="CancelButton" Content="Отмена" Width="100" Height="34" />
                 <Button x:Name="CreateButton" Content="➕ Создать смену" Width="160" Height="34" Classes="accent" />
