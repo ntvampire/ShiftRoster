@@ -229,11 +229,11 @@ public class DatabaseService
         using var cmd = conn.CreateCommand();
         if (string.IsNullOrWhiteSpace(postName))
         {
-            cmd.CommandText = "SELECT Id, FullName, Position, PostName, IsPermanent, IsActive, Notes, InitialShiftDay, ShiftPattern, SortOrder FROM Employees WHERE IsActive = 1 ORDER BY CASE WHEN SortOrder <= 0 THEN 999999 ELSE SortOrder END ASC, InitialShiftDay ASC, FullName ASC";
+            cmd.CommandText = "SELECT Id, FullName, Position, PostName, IsPermanent, IsActive, Notes, InitialShiftDay, ShiftPattern, SortOrder FROM Employees WHERE IsActive = 1 ORDER BY CASE WHEN SortOrder <= 0 THEN Id ELSE SortOrder END ASC, Id ASC";
         }
         else
         {
-            cmd.CommandText = "SELECT Id, FullName, Position, PostName, IsPermanent, IsActive, Notes, InitialShiftDay, ShiftPattern, SortOrder FROM Employees WHERE IsActive = 1 AND PostName = @post ORDER BY CASE WHEN SortOrder <= 0 THEN 999999 ELSE SortOrder END ASC, InitialShiftDay ASC, FullName ASC";
+            cmd.CommandText = "SELECT Id, FullName, Position, PostName, IsPermanent, IsActive, Notes, InitialShiftDay, ShiftPattern, SortOrder FROM Employees WHERE IsActive = 1 AND PostName = @post ORDER BY CASE WHEN SortOrder <= 0 THEN Id ELSE SortOrder END ASC, Id ASC";
             cmd.Parameters.AddWithValue("@post", postName);
         }
 
@@ -677,7 +677,7 @@ public class DatabaseService
                    ShiftCode, DayHours, NightHours, TotalHours, IsSubstitute, SubstitutedForName, Notes
             FROM RosterCells
             WHERE ScheduleId = @sid
-            ORDER BY EmployeeName, DayOfMonth";
+            ORDER BY IsSubstitute ASC, Id ASC, DayOfMonth ASC";
         cmd.Parameters.AddWithValue("@sid", scheduleId);
 
         using var reader = cmd.ExecuteReader();

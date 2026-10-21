@@ -400,10 +400,26 @@ public class RosterCalculationService
     public List<EmployeeMonthSummary> CalculateSummaries(int year, int month, IEnumerable<RosterCell> cells)
     {
         var result = new List<EmployeeMonthSummary>();
-        var empGroups = cells.GroupBy(c => c.EmployeeName);
+        var cellsList = cells.ToList();
+
+        // Фиксируем порядок первого появления сотрудника в переданном наборе ячеек (без алфавитной сортировки!)
+        var firstIndexMap = new Dictionary<string, int>();
+        for (int i = 0; i < cellsList.Count; i++)
+        {
+            string name = cellsList[i].EmployeeName;
+            if (!firstIndexMap.ContainsKey(name))
+            {
+                firstIndexMap[name] = i;
+            }
+        }
+
+        var empGroups = cellsList.GroupBy(c => c.EmployeeName)
+            .OrderBy(g => g.First().IsSubstitute ? 1 : 0)
+            .ThenBy(g => firstIndexMap[g.Key]);
+
         int order = 1;
 
-        foreach (var group in empGroups.OrderBy(g => g.First().IsSubstitute).ThenBy(g => g.Key))
+        foreach (var group in empGroups)
         {
             var firstCell = group.First();
             var summary = new EmployeeMonthSummary

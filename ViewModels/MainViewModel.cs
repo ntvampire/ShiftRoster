@@ -250,10 +250,19 @@ public partial class MainViewModel : ViewModelBase
         var orderedEmployees = DatabaseService.Instance.GetEmployees(CurrentPostName);
         var empRankMap = orderedEmployees.Select((e, idx) => (e.FullName, idx)).ToDictionary(x => x.FullName, x => x.idx);
 
+        var cellOrderMap = new Dictionary<string, int>();
+        for (int i = 0; i < cells.Count; i++)
+        {
+            if (!cellOrderMap.ContainsKey(cells[i].EmployeeName))
+            {
+                cellOrderMap[cells[i].EmployeeName] = i;
+            }
+        }
+
         var empGroups = cells.GroupBy(c => c.EmployeeName)
-            .OrderBy(g => g.First().IsSubstitute)
-            .ThenBy(g => empRankMap.TryGetValue(g.Key, out int r) ? r : 999)
-            .ThenBy(g => g.Key);
+            .OrderBy(g => g.First().IsSubstitute ? 1 : 0)
+            .ThenBy(g => !g.First().IsSubstitute && empRankMap.TryGetValue(g.Key, out int r) ? r : 999)
+            .ThenBy(g => cellOrderMap.TryGetValue(g.Key, out int idx) ? idx : 999);
 
         foreach (var group in empGroups)
         {

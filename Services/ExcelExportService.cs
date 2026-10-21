@@ -447,8 +447,31 @@ public class ExcelExportService
 
         int currentRow = startRow + 2;
 
-        // Безопасная группировка сотрудников без сбоя при наличии подменных или множественных записей
-        var empGroups = cells.GroupBy(c => c.EmployeeName).OrderBy(g => g.Key);
+        // Фиксируем строгий порядок сотрудников согласно ведомости сводки (без алфавитной сортировки!):
+        // сначала постоянные работники в порядке внесения в смену, затем подменные по порядку назначения
+        var summaryOrderMap = new Dictionary<string, int>();
+        int sIdx = 0;
+        foreach (var s in summaries)
+        {
+            if (!summaryOrderMap.ContainsKey(s.EmployeeName))
+            {
+                summaryOrderMap[s.EmployeeName] = sIdx++;
+            }
+        }
+
+        var cellOrderMap = new Dictionary<string, int>();
+        for (int i = 0; i < cells.Count; i++)
+        {
+            if (!cellOrderMap.ContainsKey(cells[i].EmployeeName))
+            {
+                cellOrderMap[cells[i].EmployeeName] = i;
+            }
+        }
+
+        var empGroups = cells.GroupBy(c => c.EmployeeName)
+            .OrderBy(g => summaryOrderMap.TryGetValue(g.Key, out int idx) ? idx : 999)
+            .ThenBy(g => g.First().IsSubstitute ? 1 : 0)
+            .ThenBy(g => cellOrderMap.TryGetValue(g.Key, out int cIdx) ? cIdx : 999);
         int order = 1;
 
         foreach (var group in empGroups)
@@ -461,7 +484,7 @@ public class ExcelExportService
             var dayCellsGroup = group.GroupBy(c => c.DayOfMonth)
                                      .ToDictionary(g => g.Key, g => g.ToList());
 
-            var summary = summaries.FirstOrDefault(s => s.EmployeeName == empName);
+            var matchingSummaries = summaries.Where(s => s.EmployeeName == empName).ToList();
 
             ws.Cell(currentRow, 1).Value = order++;
             ws.Range(currentRow, 1, currentRow + 3, 1).Merge();
@@ -565,9 +588,15 @@ public class ExcelExportService
             ws.Cell(currentRow + 2, 19).Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
 
             // --- ИТОГИ ЗА ВЕСЬ МЕСЯЦ (Колонки 20, 21, 22) ---
-            double totalMonthDays = summary?.DaysWorked ?? (half1Days + half2Days);
-            double totalMonthHours = summary?.TotalHours ?? (half1Hours + half2Hours);
-            double totalNightHours = summary?.NightHours ?? group.Sum(c => c.NightHours);
+            double totalMonthDays = matchingSummaries.Count > 0
+                ? matchingSummaries.Sum(s => s.DaysWorked)
+                : (half1Days + half2Days);
+            double totalMonthHours = matchingSummaries.Count > 0
+                ? matchingSummaries.Sum(s => s.TotalHours)
+                : (half1Hours + half2Hours);
+            double totalNightHours = matchingSummaries.Count > 0
+                ? matchingSummaries.Sum(s => s.NightHours)
+                : group.Sum(c => c.NightHours);
 
             ws.Cell(currentRow, 20).Value = totalMonthDays;
             ws.Range(currentRow, 20, currentRow + 3, 20).Merge();

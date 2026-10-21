@@ -534,6 +534,84 @@ public static class VerificationTests
 
         Console.WriteLine("[УСПЕХ] (Светлая и тёмная темы, эргономика контраста и сохранение в БД работают безупречно)");
 
+        // 16. Проверка строгого порядка работников (порядок внесения, отсутствие алфавитной сортировки, порядок назначения подменных)
+        Console.Write("16. Строгий порядок работников (порядок создания, отсутствие алфавитной сортировки)... ");
+        string orderPost = "Пост Проверки Порядка";
+        db.DeletePost(orderPost);
+
+        var o1 = new Employee { FullName = "Яковлев Я.Я.", Position = "Оператор", PostName = orderPost, InitialShiftDay = 3, SortOrder = 1 };
+        var o2 = new Employee { FullName = "Борисов Б.Б.", Position = "Оператор", PostName = orderPost, InitialShiftDay = 1, SortOrder = 2 };
+        var o3 = new Employee { FullName = "Алексеев А.А.", Position = "Оператор", PostName = orderPost, InitialShiftDay = 4, SortOrder = 3 };
+        var o4 = new Employee { FullName = "Воронов В.В.", Position = "Оператор", PostName = orderPost, InitialShiftDay = 2, SortOrder = 4 };
+        db.SaveEmployee(o1);
+        db.SaveEmployee(o2);
+        db.SaveEmployee(o3);
+        db.SaveEmployee(o4);
+
+        var orderedEmps = db.GetEmployees(orderPost);
+        if (orderedEmps[0].FullName != "Яковлев Я.Я." ||
+            orderedEmps[1].FullName != "Борисов Б.Б." ||
+            orderedEmps[2].FullName != "Алексеев А.А." ||
+            orderedEmps[3].FullName != "Воронов В.В.")
+        {
+            throw new Exception("GetEmployees вернул сотрудников не в порядке внесения!");
+        }
+
+        var orderSched = db.GetOrCreateSchedule(2026, 10, orderPost, "1/3");
+        var orderCells = calc.AutoFillOneThree(orderSched.Id, orderedEmps, 2026, 10, 2026, 10);
+
+        // Назначаем первого подменного (Юрьев) и затем второго (Григорьев)
+        calc.ApplySubstitute(orderCells, orderSched.Id, "Яковлев Я.Я.", "Юрьев Ю.Ю.", 5, 10, "О", orderedEmps, "1/3", 2026, 10, 2026, 10, "Подменный 1");
+        calc.ApplySubstitute(orderCells, orderSched.Id, "Борисов Б.Б.", "Григорьев Г.Г.", 12, 15, "Б", orderedEmps, "1/3", 2026, 10, 2026, 10, "Подменный 2");
+        db.SaveRosterCells(orderSched.Id, orderCells);
+
+        var loadedCells = db.GetRosterCells(orderSched.Id);
+        var orderSummaries = calc.CalculateSummaries(2026, 10, loadedCells);
+
+        string[] expectedOrder = { "Яковлев Я.Я.", "Борисов Б.Б.", "Алексеев А.А.", "Воронов В.В.", "Юрьев Ю.Ю.", "Григорьев Г.Г." };
+        if (orderSummaries.Count != expectedOrder.Length)
+        {
+            throw new Exception($"Ожидалось {expectedOrder.Length} записей в сводке, получено {orderSummaries.Count}");
+        }
+
+        for (int i = 0; i < expectedOrder.Length; i++)
+        {
+            if (orderSummaries[i].EmployeeName != expectedOrder[i])
+            {
+                throw new Exception($"Позиция #{i + 1}: ожидался «{expectedOrder[i]}», фактически «{orderSummaries[i].EmployeeName}»! Обнаружена некорректная сортировка.");
+            }
+        }
+
+        // Проверяем генерацию Excel файла
+        var orderExportDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Exports");
+        string testOrderXlsx = Path.Combine(orderExportDir, "Test_Strict_Order.xlsx");
+        ExcelExportService.Instance.ExportRosterToExcel(testOrderXlsx, orderSched, loadedCells, orderSummaries);
+        using (var wb = new ClosedXML.Excel.XLWorkbook(testOrderXlsx))
+        {
+            var ws1C = wb.Worksheet("Сводка для 1С");
+            for (int i = 0; i < expectedOrder.Length; i++)
+            {
+                string nameInCell = ws1C.Cell(6 + i, 2).GetString();
+                if (nameInCell != expectedOrder[i])
+                {
+                    throw new Exception($"В листе 'Сводка для 1С' строка #{i + 1} содержит «{nameInCell}» вместо «{expectedOrder[i]}»!");
+                }
+            }
+
+            var wsT13 = wb.Worksheet("Бланк Т-13");
+            for (int i = 0; i < expectedOrder.Length; i++)
+            {
+                string empCellVal = wsT13.Cell(8 + i * 4, 2).GetString();
+                if (!empCellVal.StartsWith(expectedOrder[i]))
+                {
+                    throw new Exception($"В бланке Т-13 блок #{i + 1} содержит «{empCellVal}» вместо «{expectedOrder[i]}»!");
+                }
+            }
+        }
+
+        db.DeletePost(orderPost);
+        Console.WriteLine("[УСПЕХ] (Сотрудники и подменные строго сохраняют порядок создания и назначения во всех отчетах)");
+
         Console.WriteLine("=================================================");
         Console.WriteLine("ВСЕ ТЕСТЫ И ТРЕБОВАНИЯ ТЗ УСПЕШНО ВЫПОЛНЕНЫ!");
         Console.WriteLine("=================================================");
