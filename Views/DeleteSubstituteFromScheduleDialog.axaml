@@ -1,0 +1,69 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="ShiftRoster.Views.DeleteSubstituteFromScheduleDialog"
+        Title="Снятие подмены / Удаление из графика"
+        Width="540" MinHeight="360"
+        SizeToContent="Height"
+        CanResize="False"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource AppWindowBackgroundBrush}">
+
+    <Grid RowDefinitions="Auto,*,Auto" Margin="20">
+
+        <!-- ВЕРХ: ЗАГОЛОВОК -->
+        <Border Grid.Row="0" Margin="0,0,0,16">
+            <Grid ColumnDefinitions="Auto,*">
+                <Border Grid.Column="0" Background="{DynamicResource AppDeleteButtonBackgroundBrush}" CornerRadius="8" Width="42" Height="42" Margin="0,0,12,0">
+                    <TextBlock Text="🗑️" FontSize="20" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </Border>
+                <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
+                    <TextBlock Text="Удаление подменного из графика" FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource AppTextPrimaryBrush}" />
+                    <TextBlock x:Name="SubtitleText" Text="Подразделение: ... | Период: ..." FontSize="12" Foreground="{DynamicResource AppTextTertiaryBrush}" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- ЦЕНТР: ПАРАМЕТРЫ СНЯТИЯ ПОДМЕНЫ -->
+        <Border Grid.Row="1" Background="{DynamicResource AppCardSecondaryBackgroundBrush}" CornerRadius="6" Padding="14" BorderBrush="{DynamicResource AppBorderBrush}" BorderThickness="1">
+            <StackPanel Spacing="14">
+                
+                <!-- Выбор подменного сотрудника -->
+                <StackPanel Spacing="4">
+                    <TextBlock Text="Подменный работник в текущем графике:" Foreground="{DynamicResource AppTextSecondaryBrush}" FontSize="12" />
+                    <ComboBox x:Name="SubstituteComboBox" HorizontalAlignment="Stretch" Height="34" />
+                </StackPanel>
+
+                <!-- Информационная карточка замещения -->
+                <Border Background="{DynamicResource AppCardBackgroundBrush}" CornerRadius="4" Padding="12" BorderBrush="{DynamicResource AppBorderBrush}" BorderThickness="1">
+                    <StackPanel Spacing="6">
+                        <Grid ColumnDefinitions="Auto,*">
+                            <TextBlock Grid.Column="0" Text="Замещал сотрудника: " Foreground="{DynamicResource AppTextTertiaryBrush}" FontSize="12" />
+                            <TextBlock Grid.Column="1" x:Name="SubstitutedForText" Text="—" FontWeight="SemiBold" Foreground="{DynamicResource AppTextPrimaryBrush}" FontSize="12" />
+                        </Grid>
+                        <Grid ColumnDefinitions="Auto,*">
+                            <TextBlock Grid.Column="0" Text="Всего часов в графике: " Foreground="{DynamicResource AppTextTertiaryBrush}" FontSize="12" />
+                            <TextBlock Grid.Column="1" x:Name="AssignedHoursText" Text="0.0 ч." FontWeight="Bold" Foreground="#0078D4" FontSize="12" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <!-- Чекбокс возврата смен -->
+                <CheckBox x:Name="RestoreShiftsCheckBox" IsChecked="True" VerticalAlignment="Center">
+                    <TextBlock x:Name="RestoreShiftsText" Text="Вернуть рабочие смены основному сотруднику" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource AppTextPrimaryBrush}" TextWrapping="Wrap" />
+                </CheckBox>
+
+                <TextBlock Text="* При включенной опции отметки отсутствия (Б, О) будут сняты, переданные дежурства вернутся в график основного сотрудника, а баланс круглосуточного поста (24ч) будет сохранен." 
+                           Foreground="{DynamicResource AppTextTertiaryBrush}" FontSize="11" TextWrapping="Wrap" />
+            </StackPanel>
+        </Border>
+
+        <!-- НИЗ: КНОПКИ ДЕЙСТВИЯ -->
+        <Border Grid.Row="2" Margin="0,18,0,0" Padding="0,12,0,0" BorderBrush="{DynamicResource AppBorderBrush}" BorderThickness="0,1,0,0">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10">
+                <Button x:Name="CancelButton" Content="Отмена" Width="100" Height="34" HorizontalContentAlignment="Center" />
+                <Button x:Name="DeleteButton" Content="🗑️ Удалить из табеля" Height="34" Background="{DynamicResource AppDeleteButtonBackgroundBrush}" Foreground="{DynamicResource AppDeleteButtonForegroundBrush}" FontWeight="SemiBold" HorizontalContentAlignment="Center" />
+            </StackPanel>
+        </Border>
+
+    </Grid>
+</Window>

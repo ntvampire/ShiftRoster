@@ -677,6 +677,52 @@ public partial class MainViewModel : ViewModelBase
     }
 
     /// <summary>
+    /// Удаление подменного работника из графика текущего месяца со снятием отметок отсутствия
+    /// и возвратом плановых рабочих смен основному сотруднику.
+    /// </summary>
+    public void RemoveSubstitute(string substituteFullName, bool restoreShifts = true)
+    {
+        if (_currentSchedule == null || string.IsNullOrWhiteSpace(substituteFullName)) return;
+
+        string cleanSubName = substituteFullName.Trim();
+        var subRow = Rows.FirstOrDefault(r => r.IsSubstitute && r.EmployeeName.Equals(cleanSubName, StringComparison.OrdinalIgnoreCase));
+        if (subRow == null) return;
+
+        string? mainEmpName = subRow.SubstitutedForName;
+        var postEmployees = DatabaseService.Instance.GetEmployees(CurrentPostName);
+        var (baseYear, baseMonth) = DatabaseService.Instance.GetPostBaseMonth(CurrentPostName);
+
+        var allCells = Rows.SelectMany(r => r.DayCells.Select(c => c.Model)).ToList();
+
+        RosterCalculationService.Instance.RemoveSubstitute(
+            allCells,
+            cleanSubName,
+            restoreShifts,
+            postEmployees,
+            CurrentPostPattern,
+            CurrentYear,
+            CurrentMonth,
+            baseYear,
+            baseMonth);
+
+        // Удаляем из БД записи подменного для этой смены и сохраняем актуализированные ячейки
+        DatabaseService.Instance.DeleteSubstituteCellsFromSchedule(_currentSchedule.Id, cleanSubName);
+        DatabaseService.Instance.SaveRosterCells(_currentSchedule.Id, allCells);
+
+        // Перезагружаем текущий месяц для полного и чистого обновления UI
+        LoadMonth(CurrentYear, CurrentMonth);
+
+        if (restoreShifts && !string.IsNullOrWhiteSpace(mainEmpName))
+        {
+            StatusMessage = $"Подменный «{cleanSubName}» удален из графика за {CurrentMonthName} {CurrentYear} г. Все смены возвращены сотруднику «{mainEmpName}».";
+        }
+        else
+        {
+            StatusMessage = $"Подменный «{cleanSubName}» удален из графика за {CurrentMonthName} {CurrentYear} г.";
+        }
+    }
+
+    /// <summary>
     /// Поиск всех оформленных периодов отпусков и больничных в текущем месяце
     /// для предложения при назначении подмены
     /// </summary>

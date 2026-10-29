@@ -397,6 +397,91 @@ public class RosterCalculationService
     /// Расчет итоговых показателей за месяц по каждому сотруднику.
     /// Включает подсчет праздничных часов по производственному календарю РФ (двойная оплата).
     /// </summary>
+    /// <summary>
+    /// Удаление подменного сотрудника из набора ячеек месяца со снятием отметок отсутствия
+    /// и возвратом плановых рабочих смен основному сотруднику.
+    /// </summary>
+    public void RemoveSubstitute(
+        List<RosterCell> cells,
+        string substituteFullName,
+        bool restoreShiftsToMainEmployee = true,
+        List<Employee>? postEmployees = null,
+        string postPattern = "1/3",
+        int year = 0,
+        int month = 0,
+        int baseYear = 0,
+        int baseMonth = 0)
+    {
+        if (string.IsNullOrWhiteSpace(substituteFullName)) return;
+
+        string cleanSubName = substituteFullName.Trim();
+
+        // 1. Находим все ячейки этого подменного сотрудника
+        var subCells = cells
+            .Where(c => c.IsSubstitute && c.EmployeeName.Equals(cleanSubName, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        if (subCells.Count == 0) return;
+
+        // Определяем имя основного сотрудника, за которого выходил подменный
+        string? mainEmpName = subCells.FirstOrDefault(c => !string.IsNullOrWhiteSpace(c.SubstitutedForName))?.SubstitutedForName;
+
+        if (restoreShiftsToMainEmployee)
+        {
+            var mainEmp = postEmployees?.FirstOrDefault(e => !string.IsNullOrWhiteSpace(mainEmpName) 
+                && e.FullName.Equals(mainEmpName, StringComparison.OrdinalIgnoreCase));
+
+            // Собираем все ячейки основного сотрудника
+            var mainCells = !string.IsNullOrWhiteSpace(mainEmpName)
+                ? cells.Where(c => !c.IsSubstitute && c.EmployeeName.Equals(mainEmpName, StringComparison.OrdinalIgnoreCase)).ToList()
+                : new List<RosterCell>();
+
+            var mainCellsByDay = mainCells.ToDictionary(c => c.DayOfMonth);
+
+            foreach (var subCell in subCells)
+            {
+                if (mainCellsByDay.TryGetValue(subCell.DayOfMonth, out var mainCell))
+                {
+                    // Если у подменного в этот день стояла рабочая смена — возвращаем ее основному
+                    if (subCell.TotalHours > 0)
+                    {
+                        mainCell.ShiftCode = subCell.ShiftCode;
+                        mainCell.DayHours = subCell.DayHours;
+                        mainCell.NightHours = subCell.NightHours;
+                        mainCell.TotalHours = subCell.TotalHours;
+                        mainCell.Notes = string.Empty;
+                    }
+                    else if (mainCell.Notes != null && mainCell.Notes.Contains(cleanSubName, StringComparison.OrdinalIgnoreCase))
+                    {
+                        // Если в этот день смена не передавалась (выходной день цикла),
+                        // но основной сотрудник был помечен как 'Б' или 'О' из-за этой подмены — восстанавливаем плановый статус дня
+                        if (mainEmp != null && year > 0 && month > 0)
+                        {
+                            int bYear = baseYear > 0 ? baseYear : year;
+                            int bMonth = baseMonth > 0 ? baseMonth : month;
+                            var planned = GetPlannedShiftForDay(mainEmp, postPattern, year, month, mainCell.DayOfMonth, bYear, bMonth);
+                            mainCell.ShiftCode = planned.ShiftCode;
+                            mainCell.DayHours = planned.DayHours;
+                            mainCell.NightHours = planned.NightHours;
+                            mainCell.TotalHours = planned.TotalHours;
+                        }
+                        else
+                        {
+                            mainCell.ShiftCode = "В";
+                            mainCell.DayHours = 0;
+                            mainCell.NightHours = 0;
+                            mainCell.TotalHours = 0;
+                        }
+                        mainCell.Notes = string.Empty;
+                    }
+                }
+            }
+        }
+
+        // 2. Удаляем все ячейки подменного из общего списка
+        cells.RemoveAll(c => c.IsSubstitute && c.EmployeeName.Equals(cleanSubName, StringComparison.OrdinalIgnoreCase));
+    }
+
     public List<EmployeeMonthSummary> CalculateSummaries(int year, int month, IEnumerable<RosterCell> cells)
     {
         var result = new List<EmployeeMonthSummary>();

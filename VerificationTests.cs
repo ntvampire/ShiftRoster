@@ -664,6 +664,86 @@ public static class VerificationTests
 
         Console.WriteLine("[УСПЕХ] (Справочник подменных: добавление, изменение, удаление и проверка уникальности работают без сбоев)");
 
+        // 18. Снятие подмены и удаление строки подменного из табеля с возвратом смен
+        Console.Write("18. Снятие подмены и удаление строки из графика (восстановление смен штатного)... ");
+        string subRemovePost = "Пост Проверки Снятия Подмены";
+        db.DeletePost(subRemovePost);
+
+        var p1 = new Employee { FullName = "Работник А", Position = "Оператор", PostName = subRemovePost, InitialShiftDay = 1, SortOrder = 1 };
+        var p2 = new Employee { FullName = "Работник Б", Position = "Оператор", PostName = subRemovePost, InitialShiftDay = 2, SortOrder = 2 };
+        var p3 = new Employee { FullName = "Работник В", Position = "Оператор", PostName = subRemovePost, InitialShiftDay = 3, SortOrder = 3 };
+        var p4 = new Employee { FullName = "Работник Г", Position = "Оператор", PostName = subRemovePost, InitialShiftDay = 4, SortOrder = 4 };
+        db.SaveEmployee(p1);
+        db.SaveEmployee(p2);
+        db.SaveEmployee(p3);
+        db.SaveEmployee(p4);
+
+        int novYear = 2026;
+        int novMonth = 11; // Ноябрь (30 дней)
+        db.SetPostBaseMonth(subRemovePost, novYear, novMonth);
+
+        var novSchedTest = db.GetOrCreateSchedule(novYear, novMonth, subRemovePost, "1/3");
+        var novEmps = db.GetEmployees(subRemovePost);
+        var novCellsList = calc.AutoFillOneThree(novSchedTest.Id, novEmps, novYear, novMonth, novYear, novMonth);
+
+        // Назначаем подменного взамен «Работник Б» со 2 по 7 ноября
+        string subName = "Тестовый Подменный Для Удаления";
+        calc.ApplySubstitute(novCellsList, novSchedTest.Id, "Работник Б", subName, 2, 7, "Б", novEmps, "1/3", novYear, novMonth, novYear, novMonth, "Оператор (подмена)");
+        db.SaveRosterCells(novSchedTest.Id, novCellsList);
+
+        // Проверяем, что подменный был назначен
+        var subCellsBefore = novCellsList.Where(c => c.EmployeeName == subName && c.IsSubstitute).ToList();
+        if (subCellsBefore.Count == 0)
+        {
+            throw new Exception("Подменный сотрудник не был добавлен в список ячеек!");
+        }
+
+        var mainCellDay2Before = novCellsList.First(c => c.EmployeeName == "Работник Б" && c.DayOfMonth == 2);
+        if (mainCellDay2Before.ShiftCode != "Б" || mainCellDay2Before.TotalHours != 0)
+        {
+            throw new Exception("У основного сотрудника не зафиксировался статус 'Б'!");
+        }
+
+        // Теперь снимаем подмену с возвратом смен основному сотруднику
+        calc.RemoveSubstitute(novCellsList, subName, restoreShiftsToMainEmployee: true, novEmps, "1/3", novYear, novMonth, novYear, novMonth);
+        db.DeleteSubstituteCellsFromSchedule(novSchedTest.Id, subName);
+        db.SaveRosterCells(novSchedTest.Id, novCellsList);
+
+        // Проверяем, что подменный полностью удален
+        var subCellsAfter = novCellsList.Where(c => c.EmployeeName == subName && c.IsSubstitute).ToList();
+        if (subCellsAfter.Count > 0)
+        {
+            throw new Exception("Ячейки подменного остались в списке после удаления!");
+        }
+
+        // Проверяем, что смены «Работник Б» восстановились (2 ноября = 16ч, 3 ноября = 8ч, 4-5 ноября = В)
+        var mainCellDay2After = novCellsList.First(c => c.EmployeeName == "Работник Б" && c.DayOfMonth == 2);
+        var mainCellDay3After = novCellsList.First(c => c.EmployeeName == "Работник Б" && c.DayOfMonth == 3);
+        var mainCellDay4After = novCellsList.First(c => c.EmployeeName == "Работник Б" && c.DayOfMonth == 4);
+
+        if (mainCellDay2After.ShiftCode != "16" || mainCellDay2After.TotalHours != 16.0)
+        {
+            throw new Exception($"Смена за 2 ноября не восстановилась у основного сотрудника! Получено: {mainCellDay2After.ShiftCode}, {mainCellDay2After.TotalHours}ч");
+        }
+        if (mainCellDay3After.ShiftCode != "8" || mainCellDay3After.TotalHours != 8.0)
+        {
+            throw new Exception($"Смена за 3 ноября не восстановилась у основного сотрудника! Получено: {mainCellDay3After.ShiftCode}, {mainCellDay3After.TotalHours}ч");
+        }
+        if (mainCellDay4After.ShiftCode != "В" || mainCellDay4After.TotalHours != 0.0)
+        {
+            throw new Exception($"Выходной за 4 ноября не восстановился у основного сотрудника! Получено: {mainCellDay4After.ShiftCode}");
+        }
+
+        // Проверяем баланс 24.0ч по всем 30 дням ноября
+        var novBalanceValid = calc.ValidatePostDailyBalance(novCellsList, 30);
+        if (novBalanceValid.Any(v => !v.IsValid))
+        {
+            throw new Exception("Баланс поста нарушен после снятия подмены!");
+        }
+
+        db.DeletePost(subRemovePost);
+        Console.WriteLine("[УСПЕХ] (Строка подменного удалена, смены возвращены основному сотруднику, баланс 24ч строго соблюден)");
+
         Console.WriteLine("=================================================");
         Console.WriteLine("ВСЕ ТЕСТЫ И ТРЕБОВАНИЯ ТЗ УСПЕШНО ВЫПОЛНЕНЫ!");
         Console.WriteLine("=================================================");

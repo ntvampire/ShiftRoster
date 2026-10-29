@@ -889,6 +889,18 @@ public class DatabaseService
         cmd.ExecuteNonQuery();
     }
 
+    public void DeleteSubstituteCellsFromSchedule(int scheduleId, string substituteName)
+    {
+        if (string.IsNullOrWhiteSpace(substituteName)) return;
+
+        using var conn = CreateOpenConnection();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = "DELETE FROM RosterCells WHERE ScheduleId = @sid AND EmployeeName = @name AND IsSubstitute = 1";
+        cmd.Parameters.AddWithValue("@sid", scheduleId);
+        cmd.Parameters.AddWithValue("@name", substituteName.Trim());
+        cmd.ExecuteNonQuery();
+    }
+
     public bool SubstituteExists(string fullName, int excludeId = 0)
     {
         if (string.IsNullOrWhiteSpace(fullName)) return false;

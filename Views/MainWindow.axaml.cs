@@ -3,6 +3,7 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
@@ -26,6 +27,7 @@ public partial class MainWindow : Window
         SetupWizardSidebarButton.Click += OnSetupWizardClicked;
         AssignAbsencePeriodSidebarButton.Click += OnAssignAbsencePeriodClicked;
         AssignSubstituteSidebarButton.Click += OnAssignSubstituteClicked;
+        RemoveSubstituteSidebarButton.Click += OnRemoveSubstituteSidebarClicked;
         ManageSubstitutesSidebarButton.Click += OnManageSubstitutesClicked;
         ExportExcelSidebarButton.Click += OnExportExcelClicked;
         ExportConsolidatedSidebarButton.Click += OnExportConsolidatedClicked;
@@ -396,6 +398,18 @@ public partial class MainWindow : Window
             flyout.Items.Add(item8);
         }
 
+        // Если кликнули по ячейке подменного работника — добавляем пункт быстрого удаления из табеля
+        if (cellVm.Model.IsSubstitute)
+        {
+            flyout.Items.Add(new FluentAvalonia.UI.Controls.MenuFlyoutSeparator());
+            var itemDeleteSub = new FluentAvalonia.UI.Controls.MenuFlyoutItem 
+            { 
+                Text = $"🗑️ Удалить подменного ({cellVm.Model.EmployeeName}) из табеля..." 
+            };
+            itemDeleteSub.Click += async (_, _) => await OpenDeleteSubstituteDialogAsync(cellVm.Model.EmployeeName);
+            flyout.Items.Add(itemDeleteSub);
+        }
+
         // Открываем FAMenuFlyout над целевой кнопкой ячейки
         flyout.ShowAt(btn);
     }
@@ -586,6 +600,40 @@ public partial class MainWindow : Window
         {
             vm.LoadMonth(vm.CurrentYear, vm.CurrentMonth);
             vm.StatusMessage = "База подменных сотрудников обновлена.";
+        }
+    }
+
+    private async void OnDeleteSubstituteRowClicked(object? sender, RoutedEventArgs e)
+    {
+        if (sender is Button btn && btn.DataContext is EmployeeRosterRowViewModel rowVm && rowVm.IsSubstitute)
+        {
+            await OpenDeleteSubstituteDialogAsync(rowVm.EmployeeName);
+        }
+    }
+
+    private async void OnRemoveSubstituteSidebarClicked(object? sender, RoutedEventArgs e)
+    {
+        await OpenDeleteSubstituteDialogAsync();
+    }
+
+    private async Task OpenDeleteSubstituteDialogAsync(string? preselectedName = null)
+    {
+        if (DataContext is not MainViewModel vm) return;
+
+        var subRows = vm.Rows.Where(r => r.IsSubstitute).ToList();
+        if (subRows.Count == 0)
+        {
+            vm.StatusMessage = $"В графике смены «{vm.CurrentPostName}» на {vm.CurrentMonthName} {vm.CurrentYear} г. нет подменных работников.";
+            return;
+        }
+
+        var dialog = new DeleteSubstituteFromScheduleDialog();
+        dialog.Initialize(vm.CurrentPostName, vm.CurrentYear, vm.CurrentMonth, subRows, preselectedName);
+
+        bool result = await dialog.ShowDialog<bool>(this);
+        if (result && !string.IsNullOrWhiteSpace(dialog.SelectedSubstituteName))
+        {
+            vm.RemoveSubstitute(dialog.SelectedSubstituteName, dialog.RestoreShifts);
         }
     }
 
