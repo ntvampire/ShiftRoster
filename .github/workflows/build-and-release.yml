@@ -51,6 +51,12 @@ jobs:
       - name: Package Portable Distributions
         shell: powershell
         run: |
+          # Защита данных: исключаем любые БД, бэкапы и пользовательские экспорты
+          Remove-Item -Path "publish\win-x64\*.db", "publish\win-x86\*.db" -Force -ErrorAction SilentlyContinue
+          Remove-Item -Path "publish\win-x64\Backups", "publish\win-x86\Backups" -Recurse -Force -ErrorAction SilentlyContinue
+          Remove-Item -Path "publish\win-x64\Exports", "publish\win-x86\Exports" -Recurse -Force -ErrorAction SilentlyContinue
+          Remove-Item -Path "publish\win-x64\*.log", "publish\win-x86\*.log" -Force -ErrorAction SilentlyContinue
+
           # 1. Windows x64 Portable
           Compress-Archive -Path "publish\win-x64\*" -DestinationPath "publish\ShiftRoster-win-x64.zip" -Force
 
