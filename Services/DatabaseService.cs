@@ -17,12 +17,16 @@ public class DatabaseService
     private static DatabaseService? _instance;
     public static DatabaseService Instance => _instance ??= new DatabaseService();
 
+    private readonly string _dataDir;
     private readonly string _dbPath;
     private readonly string _backupsDir;
+    private readonly string _exportsDir;
     private readonly string _connectionString;
 
+    public string DataDirectory => _dataDir;
     public string DatabasePath => _dbPath;
     public string BackupsDirectory => _backupsDir;
+    public string ExportsDirectory => _exportsDir;
 
     public SqliteConnection CreateOpenConnection()
     {
@@ -36,13 +40,57 @@ public class DatabaseService
 
     public DatabaseService()
     {
-        string baseDir = AppDomain.CurrentDomain.BaseDirectory;
-        _dbPath = Path.Combine(baseDir, "ShiftRoster.db");
-        _backupsDir = Path.Combine(baseDir, "Backups");
+        _dataDir = ResolveDataDirectory();
+        _dbPath = Path.Combine(_dataDir, "ShiftRoster.db");
+        _backupsDir = Path.Combine(_dataDir, "Backups");
+        _exportsDir = Path.Combine(_dataDir, "Exports");
         _connectionString = $"Data Source={_dbPath}";
 
         PerformStartupBackup();
         InitializeDatabase();
+    }
+
+    private static string ResolveDataDirectory()
+    {
+        string baseDir = AppDomain.CurrentDomain.BaseDirectory;
+        string localAppDataDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ShiftRoster");
+
+        // 1. Проверяем, существует ли уже база в папке с исполняемым файлом (портативный запуск)
+        string baseDbFile = Path.Combine(baseDir, "ShiftRoster.db");
+        if (File.Exists(baseDbFile) && IsDirectoryWritable(baseDir))
+        {
+            return baseDir;
+        }
+
+        // 2. Если папка программы не Program Files и доступна для записи - используем папку программы
+        string progFiles = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
+        string progFilesX86 = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86);
+        bool isInsideProgramFiles = (!string.IsNullOrEmpty(progFiles) && baseDir.StartsWith(progFiles, StringComparison.OrdinalIgnoreCase))
+                                 || (!string.IsNullOrEmpty(progFilesX86) && baseDir.StartsWith(progFilesX86, StringComparison.OrdinalIgnoreCase));
+
+        if (!isInsideProgramFiles && IsDirectoryWritable(baseDir))
+        {
+            return baseDir;
+        }
+
+        // 3. Если Program Files или папка защищена от записи без прав администратора - используем %LOCALAPPDATA%\ShiftRoster
+        Directory.CreateDirectory(localAppDataDir);
+        return localAppDataDir;
+    }
+
+    private static bool IsDirectoryWritable(string dir)
+    {
+        try
+        {
+            string testFile = Path.Combine(dir, $".write_test_{Guid.NewGuid():N}.tmp");
+            File.WriteAllText(testFile, "test");
+            File.Delete(testFile);
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     /// <summary>

@@ -35,13 +35,13 @@ jobs:
         run: dotnet run -- --test
 
       - name: Build Windows x64 (Self-Contained)
-        run: dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o publish/win-x64
+        run: dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o publish/win-x64
 
       - name: Build Windows x86 (Self-Contained 32-bit)
-        run: dotnet publish -c Release -r win-x86 --self-contained true -p:PublishSingleFile=true -o publish/win-x86
+        run: dotnet publish -c Release -r win-x86 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o publish/win-x86
 
       - name: Build Linux x64 (Self-Contained)
-        run: dotnet publish -c Release -r linux-x64 --self-contained true -p:PublishSingleFile=true -o publish/linux-x64
+        run: dotnet publish -c Release -r linux-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o publish/linux-x64
 
       - name: Build Windows Installer (Inno Setup)
         shell: powershell

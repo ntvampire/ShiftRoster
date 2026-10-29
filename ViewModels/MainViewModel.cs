@@ -888,8 +888,7 @@ public partial class MainViewModel : ViewModelBase
 
         if (string.IsNullOrWhiteSpace(targetFilePath))
         {
-            string baseDir = AppDomain.CurrentDomain.BaseDirectory;
-            string exportDir = Path.Combine(baseDir, "Exports");
+            string exportDir = DatabaseService.Instance.ExportsDirectory;
             if (!Directory.Exists(exportDir))
             {
                 Directory.CreateDirectory(exportDir);
@@ -942,8 +941,7 @@ public partial class MainViewModel : ViewModelBase
 
         if (string.IsNullOrWhiteSpace(targetFilePath))
         {
-            string baseDir = AppDomain.CurrentDomain.BaseDirectory;
-            string exportDir = Path.Combine(baseDir, "Exports");
+            string exportDir = DatabaseService.Instance.ExportsDirectory;
             if (!Directory.Exists(exportDir))
             {
                 Directory.CreateDirectory(exportDir);

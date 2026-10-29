@@ -1,7 +1,7 @@
 ; Скрипт создания установщика ShiftRoster для Windows 7, 8, 10, 11 (Inno Setup)
 #define MyAppName "ShiftRoster"
 #define MyAppUserTitle "График смен"
-#define MyAppVersion "1.0.0"
+#define MyAppVersion "1.0.1"
 #define MyAppPublisher "ShiftRoster Development"
 #define MyAppExeName "ShiftRoster.exe"
 
@@ -30,7 +30,7 @@ Name: "russian"; MessagesFile: "compiler:Languages\Russian.isl"
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"
 
 [Files]
-Source: "publish\win-x64\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
+Source: "publish\win-x64\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "*.db,*.pdb,*.log,Backups,Exports"
 
 [Icons]
 Name: "{group}\{#MyAppUserTitle}"; Filename: "{app}\{#MyAppExeName}"

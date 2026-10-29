@@ -8,6 +8,8 @@
     <AssemblyName>ShiftRoster</AssemblyName>
     <RootNamespace>ShiftRoster</RootNamespace>
     <ApplicationIcon>Assets\app.ico</ApplicationIcon>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <Version>1.0.1</Version>
   </PropertyGroup>
 
   <ItemGroup>
