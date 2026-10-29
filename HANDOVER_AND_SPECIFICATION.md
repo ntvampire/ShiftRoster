@@ -2,8 +2,8 @@
 ## Паспорт проекта, актуальное ТЗ и текущее состояние для переноса в новый чат
 
 *Дата фиксации состояния:* 29 октября 2026 г.  
-*Репозиторий проекта:* `D:\Projects\ShiftRoster`  
-*Текущий Git-коммит:* `cda545e`  
+*Локальный репозиторий:* `D:\Projects\ShiftRoster`  
+*GitHub репозиторий:* [https://github.com/ntvampire/ShiftRoster](https://github.com/ntvampire/ShiftRoster)  
 *Статус верификации:* 21 из 21 тестов пройдены успешно (`dotnet run -- --test`)  
 
 ---
