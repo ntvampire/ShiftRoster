@@ -12,6 +12,7 @@ namespace ShiftRoster.ViewModels;
 public partial class RosterCellViewModel : ObservableObject
 {
     public RosterCell Model { get; }
+    public string EmployeeName => Model.EmployeeName;
     public int DayOfMonth => Model.DayOfMonth;
     public string DayOfWeekName { get; set; } = string.Empty;
     public bool IsWeekend { get; set; }

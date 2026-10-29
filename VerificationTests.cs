@@ -744,6 +744,221 @@ public static class VerificationTests
         db.DeletePost(subRemovePost);
         Console.WriteLine("[УСПЕХ] (Строка подменного удалена, смены возвращены основному сотруднику, баланс 24ч строго соблюден)");
 
+        // 19. Проверка схемы «Сутки через двое (1/2)» (3 человека, 16ч + 8ч, строго 24.0 ч/сут каждый день)
+        Console.Write("19. Схема сменности «Сутки через двое (1/2)» (3 человека, контроль баланса 24.0ч)... ");
+        string postOneTwo = "Пост Проверки 1/2";
+        db.DeletePost(postOneTwo);
+
+        var emp12_1 = new Employee { FullName = "Сменщик 1", Position = "Оператор", PostName = postOneTwo, InitialShiftDay = 1, SortOrder = 1, ShiftPattern = "1/2" };
+        var emp12_2 = new Employee { FullName = "Сменщик 2", Position = "Оператор", PostName = postOneTwo, InitialShiftDay = 2, SortOrder = 2, ShiftPattern = "1/2" };
+        var emp12_3 = new Employee { FullName = "Сменщик 3", Position = "Оператор", PostName = postOneTwo, InitialShiftDay = 3, SortOrder = 3, ShiftPattern = "1/2" };
+        db.SaveEmployee(emp12_1);
+        db.SaveEmployee(emp12_2);
+        db.SaveEmployee(emp12_3);
+
+        int year12 = 2027;
+        int month12 = 1; // Январь (31 день)
+        db.SetPostBaseMonth(postOneTwo, year12, month12);
+
+        var sched12 = db.GetOrCreateSchedule(year12, month12, postOneTwo, "1/2");
+        var emps12 = db.GetEmployees(postOneTwo);
+        if (emps12.Count != 3)
+        {
+            throw new Exception($"Ожидалось 3 сотрудника для схемы 1/2, получено: {emps12.Count}");
+        }
+
+        var cells12 = calc.AutoFillOneTwo(sched12.Id, emps12, year12, month12, year12, month12);
+        db.SaveRosterCells(sched12.Id, cells12);
+
+        // Проверяем суточный баланс по каждому из 31 дня января
+        var balance12 = calc.ValidatePostDailyBalance(cells12, 31);
+        foreach (var val in balance12)
+        {
+            if (!val.IsValid)
+            {
+                throw new Exception($"День {val.DayOfMonth}: баланс {val.TotalHours}ч вместо 24.0ч!");
+            }
+        }
+        db.DeletePost(postOneTwo);
+        Console.WriteLine("[УСПЕХ] (Схема 1/2: 3 человека, все 31 день месяца строго 24.0 ч/сутки)");
+
+        // 20. Подбор свободных сменщиков и оперативная подмена коллегой в свой выходной день
+        Console.Write("20. Оперативная подмена коллегой в выходной день (с оценкой безопасности)... ");
+        string postCov = "Пост Проверки Подмены Коллегой";
+        db.DeletePost(postCov);
+
+        var cEmp1 = new Employee { FullName = "Дежурный 1", Position = "Оператор", PostName = postCov, InitialShiftDay = 1, SortOrder = 1, ShiftPattern = "1/3" };
+        var cEmp2 = new Employee { FullName = "Дежурный 2", Position = "Оператор", PostName = postCov, InitialShiftDay = 2, SortOrder = 2, ShiftPattern = "1/3" };
+        var cEmp3 = new Employee { FullName = "Дежурный 3", Position = "Оператор", PostName = postCov, InitialShiftDay = 3, SortOrder = 3, ShiftPattern = "1/3" };
+        var cEmp4 = new Employee { FullName = "Дежурный 4", Position = "Оператор", PostName = postCov, InitialShiftDay = 4, SortOrder = 4, ShiftPattern = "1/3" };
+        db.SaveEmployee(cEmp1);
+        db.SaveEmployee(cEmp2);
+        db.SaveEmployee(cEmp3);
+        db.SaveEmployee(cEmp4);
+
+        db.SetPostBaseMonth(postCov, 2026, 11);
+        var covEmps = db.GetEmployees(postCov);
+
+        // На 1 ноября: Дежурный 1 заступает (16ч), Дежурный 4 сдает (8ч), Дежурные 2 и 3 имеют законный выходной
+        // Пусть Дежурный 1 заболел 1 ноября. Проверяем кандидатов на замену
+        var candidates = calc.FindCoverageCandidates(covEmps, "1/3", 2026, 11, 1, "Дежурный 1", 2026, 11);
+        if (candidates.Count != 3)
+        {
+            throw new Exception($"Ожидалось 3 кандидата, получено: {candidates.Count}");
+        }
+
+        var candidate2 = candidates.First(c => c.FullName == "Дежурный 2");
+        var candidate3 = candidates.First(c => c.FullName == "Дежурный 3");
+        var candidate4 = candidates.First(c => c.FullName == "Дежурный 4");
+
+        // Дежурный 4 дежурил 31 октября (сдает 1 ноября утром) -> должен иметь предупреждение WorkedYesterday
+        if (!candidate4.WorkedYesterday)
+        {
+            throw new Exception("Дежурный 4 должен быть помечен как сдававший смену накануне!");
+        }
+
+        // Дежурный 3 — идеальный кандидат: плановый выходной, вчера не дежурил, завтра не заступает
+        if (!candidate3.IsRecommended)
+        {
+            throw new Exception("Дежурный 3 должен быть рекомендован для подмены!");
+        }
+
+        // Оформляем выход Дежурного 3 взамен Дежурного 1 на 1 ноября
+        var covSched = db.GetOrCreateSchedule(2026, 11, postCov, "1/3");
+        var covSub = new ShiftSubstitution
+        {
+            ScheduleId = covSched.Id,
+            PostName = postCov,
+            DayOfMonth = 1,
+            ScheduledEmployeeName = "Дежурный 1",
+            ActualEmployeeName = "Дежурный 3",
+            IsExternalSubstitute = false,
+            ShiftCode = "16",
+            DayHours = 14,
+            NightHours = 2,
+            TotalHours = 16,
+            ReasonCode = "Б",
+            Notes = "Подмена в выходной"
+        };
+        db.SaveShiftSubstitution(covSub);
+
+        var absList = new List<AbsenceEvent>
+        {
+            new AbsenceEvent
+            {
+                ScheduleId = covSched.Id,
+                PostName = postCov,
+                EmployeeName = "Дежурный 1",
+                StartDay = 1,
+                EndDay = 1,
+                AbsenceType = "Б"
+            }
+        };
+
+        var matCells = calc.BuildMaterializedSchedule(
+            covSched.Id,
+            covEmps,
+            "1/3",
+            2026,
+            11,
+            2026,
+            11,
+            absList,
+            new List<ShiftSubstitution> { covSub },
+            new List<ShiftSwap>());
+
+        // Проверяем, что смена Дежурного 1 = 'Б', а Дежурный 3 получил 16ч
+        var cellD1 = matCells.First(c => c.EmployeeName == "Дежурный 1" && c.DayOfMonth == 1);
+        var cellD3 = matCells.First(c => c.EmployeeName == "Дежурный 3" && c.DayOfMonth == 1);
+
+        if (cellD1.ShiftCode != "Б" || cellD1.TotalHours != 0)
+        {
+            throw new Exception($"У Дежурного 1 статус должен быть 'Б' с 0ч, получено: {cellD1.ShiftCode}, {cellD1.TotalHours}ч");
+        }
+        if (cellD3.ShiftCode != "16" || cellD3.TotalHours != 16.0)
+        {
+            throw new Exception($"Дежурный 3 должен отработать 16ч, получено: {cellD3.ShiftCode}, {cellD3.TotalHours}ч");
+        }
+
+        // Проверяем баланс суток 1 ноября: 16ч (Дежурный 3) + 8ч (Дежурный 4) = ровно 24.0ч!
+        var day1Sum = matCells.Where(c => c.DayOfMonth == 1).Sum(c => c.TotalHours);
+        if (day1Sum != 24.0)
+        {
+            throw new Exception($"Суточный баланс за 1 ноября нарушен: получено {day1Sum}ч вместо 24.0ч!");
+        }
+
+        db.DeletePost(postCov);
+        Console.WriteLine("[УСПЕХ] (Безопасность проверена, выход коллеги зафиксирован, суточный баланс 24.0ч сохранен)");
+
+        // 21. Взаимный обмен сменами (со смещением) и неразрушающее наложение слоев
+        Console.Write("21. Взаимный обмен сменами (смещение) и неразрушающее наложение слоев... ");
+        string postSwap = "Пост Проверки Обмена Сменами";
+        db.DeletePost(postSwap);
+
+        var sEmp1 = new Employee { FullName = "Сотрудник А", Position = "Оператор", PostName = postSwap, InitialShiftDay = 1, SortOrder = 1, ShiftPattern = "1/3" };
+        var sEmp2 = new Employee { FullName = "Сотрудник Б", Position = "Оператор", PostName = postSwap, InitialShiftDay = 2, SortOrder = 2, ShiftPattern = "1/3" };
+        var sEmp3 = new Employee { FullName = "Сотрудник В", Position = "Оператор", PostName = postSwap, InitialShiftDay = 3, SortOrder = 3, ShiftPattern = "1/3" };
+        var sEmp4 = new Employee { FullName = "Сотрудник Г", Position = "Оператор", PostName = postSwap, InitialShiftDay = 4, SortOrder = 4, ShiftPattern = "1/3" };
+        db.SaveEmployee(sEmp1);
+        db.SaveEmployee(sEmp2);
+        db.SaveEmployee(sEmp3);
+        db.SaveEmployee(sEmp4);
+
+        db.SetPostBaseMonth(postSwap, 2026, 11);
+        var sEmps = db.GetEmployees(postSwap);
+        var swapSched = db.GetOrCreateSchedule(2026, 11, postSwap, "1/3");
+
+        // Базовые смены:
+        // 1 ноября: Сотрудник А (16ч), Сотрудник Г (8ч), Сотрудник Б (В)
+        // 2 ноября: Сотрудник Б (16ч), Сотрудник А (8ч), Сотрудник В (В)
+        // Сотрудник А просит 1 ноября выходной, Сотрудник Б согласен выйти за него 1-го, если Сотрудник А выйдет за него 2-го числа
+        var swapEvent = new ShiftSwap
+        {
+            ScheduleId = swapSched.Id,
+            PostName = postSwap,
+            Day1 = 1,
+            Employee1Name = "Сотрудник А",
+            Day2 = 2,
+            Employee2Name = "Сотрудник Б",
+            Reason = "По заявлению"
+        };
+        db.SaveShiftSwap(swapEvent);
+
+        var swappedCells = calc.BuildMaterializedSchedule(
+            swapSched.Id,
+            sEmps,
+            "1/3",
+            2026,
+            11,
+            2026,
+            11,
+            new List<AbsenceEvent>(),
+            new List<ShiftSubstitution>(),
+            new List<ShiftSwap> { swapEvent });
+
+        // На 1 ноября: у Сотрудника А должно быть 'В', у Сотрудника Б должно быть '16ч'
+        var aDay1 = swappedCells.First(c => c.EmployeeName == "Сотрудник А" && c.DayOfMonth == 1);
+        var bDay1 = swappedCells.First(c => c.EmployeeName == "Сотрудник Б" && c.DayOfMonth == 1);
+        if (aDay1.ShiftCode != "В" || aDay1.TotalHours != 0)
+        {
+            throw new Exception($"Сотрудник А должен иметь выходной 1 ноября! Получено: {aDay1.ShiftCode}, {aDay1.TotalHours}ч");
+        }
+        if (bDay1.ShiftCode != "16" || bDay1.TotalHours != 16.0)
+        {
+            throw new Exception($"Сотрудник Б должен заступить 1 ноября (16ч)! Получено: {bDay1.ShiftCode}, {bDay1.TotalHours}ч");
+        }
+
+        // Баланс за 1 и 2 ноября должен быть строго 24.0ч
+        var sumDay1 = swappedCells.Where(c => c.DayOfMonth == 1).Sum(c => c.TotalHours);
+        var sumDay2 = swappedCells.Where(c => c.DayOfMonth == 2).Sum(c => c.TotalHours);
+        if (sumDay1 != 24.0 || sumDay2 != 24.0)
+        {
+            throw new Exception($"Баланс нарушен при обмене сменами! День 1: {sumDay1}ч, День 2: {sumDay2}ч (ожидалось 24.0ч)");
+        }
+
+        db.DeletePost(postSwap);
+        Console.WriteLine("[УСПЕХ] (Смены взаимно поменялись местами, баланс 24.0ч/сут безупречно сохранен)");
+
         Console.WriteLine("=================================================");
         Console.WriteLine("ВСЕ ТЕСТЫ И ТРЕБОВАНИЯ ТЗ УСПЕШНО ВЫПОЛНЕНЫ!");
         Console.WriteLine("=================================================");

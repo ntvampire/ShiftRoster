@@ -8,6 +8,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using FluentAvalonia.UI.Controls;
+using ShiftRoster.Services;
 using ShiftRoster.ViewModels;
 
 namespace ShiftRoster.Views;
@@ -27,6 +28,7 @@ public partial class MainWindow : Window
         SetupWizardSidebarButton.Click += OnSetupWizardClicked;
         AssignAbsencePeriodSidebarButton.Click += OnAssignAbsencePeriodClicked;
         AssignSubstituteSidebarButton.Click += OnAssignSubstituteClicked;
+        ShiftCoverageSidebarButton.Click += async (_, _) => await OpenShiftCoverageDialogAsync();
         RemoveSubstituteSidebarButton.Click += OnRemoveSubstituteSidebarClicked;
         ManageSubstitutesSidebarButton.Click += OnManageSubstitutesClicked;
         ExportExcelSidebarButton.Click += OnExportExcelClicked;
@@ -409,6 +411,16 @@ public partial class MainWindow : Window
             itemDeleteSub.Click += async (_, _) => await OpenDeleteSubstituteDialogAsync(cellVm.Model.EmployeeName);
             flyout.Items.Add(itemDeleteSub);
         }
+        else
+        {
+            flyout.Items.Add(new FluentAvalonia.UI.Controls.MenuFlyoutSeparator());
+            var itemCoverage = new FluentAvalonia.UI.Controls.MenuFlyoutItem
+            {
+                Text = $"⚡ Закрыть смену коллеги / Обмен ({cellVm.DayOfMonth}-е число)..."
+            };
+            itemCoverage.Click += async (_, _) => await OpenShiftCoverageDialogAsync(cellVm.DayOfMonth, cellVm.EmployeeName);
+            flyout.Items.Add(itemCoverage);
+        }
 
         // Открываем FAMenuFlyout над целевой кнопкой ячейки
         flyout.ShowAt(btn);
@@ -634,6 +646,36 @@ public partial class MainWindow : Window
         if (result && !string.IsNullOrWhiteSpace(dialog.SelectedSubstituteName))
         {
             vm.RemoveSubstitute(dialog.SelectedSubstituteName, dialog.RestoreShifts);
+        }
+    }
+
+    private async Task OpenShiftCoverageDialogAsync(int? day = null, string? empName = null)
+    {
+        if (DataContext is not MainViewModel vm) return;
+        if (string.IsNullOrWhiteSpace(vm.CurrentPostName)) return;
+
+        var employees = DatabaseService.Instance.GetEmployees(vm.CurrentPostName);
+        if (employees.Count == 0)
+        {
+            vm.StatusMessage = "В подразделении пока нет сотрудников для закрытия смен.";
+            return;
+        }
+
+        var dialog = new ShiftCoverageDialog();
+        dialog.Initialize(
+            vm.CurrentPostName,
+            vm.CurrentPostPattern,
+            vm.CurrentYear,
+            vm.CurrentMonth,
+            vm.CurrentScheduleId,
+            employees,
+            day,
+            empName);
+
+        bool result = await dialog.ShowDialog<bool>(this);
+        if (result)
+        {
+            vm.ApplyOperationalEventsAndSave();
         }
     }
 

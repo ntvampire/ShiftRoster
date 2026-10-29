@@ -52,6 +52,7 @@
                             <TextBlock Text="Схема сменного графика:" Foreground="{DynamicResource AppTextSecondaryBrush}" FontSize="13" />
                             <ComboBox x:Name="ScheduleTypeComboBox" HorizontalAlignment="Stretch" SelectedIndex="0" Height="36">
                                 <ComboBoxItem Content="Сутки через трое (1/3) — 16ч в день заступления / 8ч на след. день" Tag="1/3" />
+                                <ComboBoxItem Content="Сутки через двое (1/2) — 16ч в день заступления / 8ч на след. день" Tag="1/2" />
                                 <ComboBoxItem Content="2 через 2 — по 12 часов (День / Ночь)" Tag="2/2" />
                             </ComboBox>
                             <TextBlock Text="* При схеме 1/3 в каждые сутки на посту ровно 24 часа (8ч сдача смены + 16ч заступление)." 

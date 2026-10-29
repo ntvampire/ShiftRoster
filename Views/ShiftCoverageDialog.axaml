@@ -1,0 +1,176 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="ShiftRoster.Views.ShiftCoverageDialog"
+        Title="Оперативное закрытие смены и взаимный обмен"
+        Width="640" Height="620" MinHeight="540"
+        SizeToContent="Height"
+        CanResize="True"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource AppWindowBackgroundBrush}">
+
+    <Grid RowDefinitions="Auto,*,Auto" Margin="20">
+
+        <!-- ВЕРХ: ШАПКА -->
+        <Border Grid.Row="0" Margin="0,0,0,14">
+            <Grid ColumnDefinitions="Auto,*">
+                <Border Grid.Column="0" Background="#0078D4" CornerRadius="8" Width="40" Height="40" Margin="0,0,12,0">
+                    <TextBlock Text="⚡" FontSize="20" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </Border>
+                <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
+                    <TextBlock Text="Оперативное закрытие смены / Обмен сменами" FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource AppTextPrimaryBrush}" />
+                    <TextBlock x:Name="SubtitleText" Text="Подразделение: ... | Период: ..." FontSize="12" Foreground="{DynamicResource AppTextTertiaryBrush}" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- ЦЕНТР: ВКЛАДКИ РЕЖИМОВ -->
+        <TabControl Grid.Row="1">
+
+            <!-- ВКЛАДКА 1: ВЫХОД КОЛЛЕГИ В СВОЙ ВЫХОДНОЙ -->
+            <TabItem Header="👤 Выход коллеги в выходной">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel Spacing="14" Margin="0,10,0,0">
+
+                        <Border Background="{DynamicResource AppCardSecondaryBackgroundBrush}" CornerRadius="6" Padding="12" BorderBrush="{DynamicResource AppBorderBrush}" BorderThickness="1">
+                            <StackPanel Spacing="10">
+                                <TextBlock Text="1. Выберите дату и отсутствующего сотрудника:" FontWeight="SemiBold" Foreground="{DynamicResource AppTextPrimaryBrush}" FontSize="13" />
+
+                                <Grid ColumnDefinitions="*,16,*">
+                                    <StackPanel Grid.Column="0" Spacing="4">
+                                        <TextBlock Text="Число месяца (день):" Foreground="{DynamicResource AppTextSecondaryBrush}" FontSize="12" />
+                                        <NumericUpDown x:Name="DayNumeric" Minimum="1" Maximum="31" Value="1" Height="34" FormatString="0" />
+                                    </StackPanel>
+
+                                    <StackPanel Grid.Column="2" Spacing="4">
+                                        <TextBlock Text="Кого заменяем:" Foreground="{DynamicResource AppTextSecondaryBrush}" FontSize="12" />
+                                        <ComboBox x:Name="AbsentEmployeeComboBox" HorizontalAlignment="Stretch" Height="34" />
+                                    </StackPanel>
+                                </Grid>
+
+                                <Grid ColumnDefinitions="*,16,*">
+                                    <StackPanel Grid.Column="0" Spacing="4">
+                                        <TextBlock Text="Плановая смена сотрудника:" Foreground="{DynamicResource AppTextSecondaryBrush}" FontSize="12" />
+                                        <TextBox x:Name="PlannedShiftTextBox" IsReadOnly="True" Height="34" FontWeight="SemiBold" Foreground="#0078D4" />
+                                    </StackPanel>
+
+                                    <StackPanel Grid.Column="2" Spacing="4">
+                                        <TextBlock Text="Причина отсутствия:" Foreground="{DynamicResource AppTextSecondaryBrush}" FontSize="12" />
+                                        <ComboBox x:Name="CoverageReasonComboBox" HorizontalAlignment="Stretch" SelectedIndex="0" Height="34">
+                                            <ComboBoxItem Content="🏥 Больничный лист (Б)" Tag="Б" />
+                                            <ComboBoxItem Content="🏖️ Отпуск / отгул (О)" Tag="О" />
+                                            <ComboBoxItem Content="🔄 Подмена по договоренности" Tag="Подмена" />
+                                        </ComboBox>
+                                    </StackPanel>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Background="{DynamicResource AppCardSecondaryBackgroundBrush}" CornerRadius="6" Padding="12" BorderBrush="{DynamicResource AppBorderBrush}" BorderThickness="1">
+                            <StackPanel Spacing="10">
+                                <TextBlock Text="2. Выберите коллегу для выхода в свой выходной:" FontWeight="SemiBold" Foreground="{DynamicResource AppTextPrimaryBrush}" FontSize="13" />
+                                <TextBlock Text="* Зеленым отмечены сотрудники с плановым выходным без дежурств накануне и на следующий день." Foreground="{DynamicResource AppTextTertiaryBrush}" FontSize="11" />
+
+                                <ListBox x:Name="CandidatesListBox" Height="140" Background="{DynamicResource AppCardBackgroundBrush}" CornerRadius="4" BorderBrush="{DynamicResource AppBorderBrush}" BorderThickness="1">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid ColumnDefinitions="*,Auto" Margin="4,2">
+                                                <StackPanel Grid.Column="0" Spacing="2">
+                                                    <TextBlock Text="{Binding FullName}" FontWeight="SemiBold" Foreground="{DynamicResource AppTextPrimaryBrush}" FontSize="13" />
+                                                    <TextBlock Text="{Binding Position}" Foreground="{DynamicResource AppTextTertiaryBrush}" FontSize="11" />
+                                                    <TextBlock Text="{Binding WarningText}" Foreground="#D83B01" FontSize="11" IsVisible="{Binding WarningText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                                                </StackPanel>
+                                                <Border Grid.Column="1" VerticalAlignment="Center" Padding="8,4" CornerRadius="4" Background="{DynamicResource AppSubtleHighlightBrush}">
+                                                    <TextBlock Text="{Binding SafetyBadge}" FontSize="11" FontWeight="SemiBold" />
+                                                </Border>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                            </StackPanel>
+                        </Border>
+
+                        <Button x:Name="ApplyCoverageButton" Content="⚡ Назначить дежурство коллеге" Height="36" HorizontalAlignment="Stretch" Classes="accent" HorizontalContentAlignment="Center" FontWeight="SemiBold" />
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- ВКЛАДКА 2: ВЗАИМНЫЙ ОБМЕН СМЕНАМИ -->
+            <TabItem Header="🔄 Взаимный обмен сменами (смещение)">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel Spacing="14" Margin="0,10,0,0">
+
+                        <Border Background="{DynamicResource AppCardSecondaryBackgroundBrush}" CornerRadius="6" Padding="12" BorderBrush="{DynamicResource AppBorderBrush}" BorderThickness="1">
+                            <StackPanel Spacing="10">
+                                <TextBlock Text="Сотрудник 1 (просит освободить свой день):" FontWeight="SemiBold" Foreground="{DynamicResource AppTextPrimaryBrush}" FontSize="13" />
+                                <Grid ColumnDefinitions="*,16,140">
+                                    <StackPanel Grid.Column="0" Spacing="4">
+                                        <TextBlock Text="ФИО сотрудника 1:" Foreground="{DynamicResource AppTextSecondaryBrush}" FontSize="12" />
+                                        <ComboBox x:Name="SwapEmp1ComboBox" HorizontalAlignment="Stretch" Height="34" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2" Spacing="4">
+                                        <TextBlock Text="День смены 1:" Foreground="{DynamicResource AppTextSecondaryBrush}" FontSize="12" />
+                                        <NumericUpDown x:Name="SwapDay1Numeric" Minimum="1" Maximum="31" Value="1" Height="34" FormatString="0" />
+                                    </StackPanel>
+                                </Grid>
+                                <TextBlock x:Name="SwapShift1InfoText" Text="Плановая смена: —" Foreground="#0078D4" FontWeight="SemiBold" FontSize="12" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border Background="{DynamicResource AppCardSecondaryBackgroundBrush}" CornerRadius="6" Padding="12" BorderBrush="{DynamicResource AppBorderBrush}" BorderThickness="1">
+                            <StackPanel Spacing="10">
+                                <TextBlock Text="Сотрудник 2 (согласен поменяться):" FontWeight="SemiBold" Foreground="{DynamicResource AppTextPrimaryBrush}" FontSize="13" />
+                                <Grid ColumnDefinitions="*,16,140">
+                                    <StackPanel Grid.Column="0" Spacing="4">
+                                        <TextBlock Text="ФИО сотрудника 2:" Foreground="{DynamicResource AppTextSecondaryBrush}" FontSize="12" />
+                                        <ComboBox x:Name="SwapEmp2ComboBox" HorizontalAlignment="Stretch" Height="34" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2" Spacing="4">
+                                        <TextBlock Text="День смены 2:" Foreground="{DynamicResource AppTextSecondaryBrush}" FontSize="12" />
+                                        <NumericUpDown x:Name="SwapDay2Numeric" Minimum="1" Maximum="31" Value="2" Height="34" FormatString="0" />
+                                    </StackPanel>
+                                </Grid>
+                                <TextBlock x:Name="SwapShift2InfoText" Text="Плановая смена: —" Foreground="#0078D4" FontWeight="SemiBold" FontSize="12" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border Background="{DynamicResource AppCardBackgroundBrush}" CornerRadius="6" Padding="12" BorderBrush="{DynamicResource AppBorderBrush}" BorderThickness="1">
+                            <TextBlock Text="ℹ️ Дежурства Сотрудника 1 и Сотрудника 2 на указанные дни будут взаимно заменены. Баланс круглосуточного поста (24.0ч) будет строго сохранен." 
+                                       Foreground="{DynamicResource AppTextTertiaryBrush}" FontSize="11" TextWrapping="Wrap" />
+                        </Border>
+
+                        <Button x:Name="ApplySwapButton" Content="🔄 Выполнить взаимный обмен сменами" Height="36" HorizontalAlignment="Stretch" Classes="accent" HorizontalContentAlignment="Center" FontWeight="SemiBold" />
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- ВКЛАДКА 3: АКТИВНЫЕ ПОДМЕНЫ И ОБМЕНЫ МЕСЯЦА -->
+            <TabItem Header="📋 Журнал за месяц">
+                <Grid RowDefinitions="*,Auto" Margin="0,10,0,0">
+                    <ListBox x:Name="ActiveEventsListBox" Grid.Row="0" Height="260" Background="{DynamicResource AppCardBackgroundBrush}" CornerRadius="4" BorderBrush="{DynamicResource AppBorderBrush}" BorderThickness="1">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Grid ColumnDefinitions="*,Auto" Margin="4,2">
+                                    <StackPanel Grid.Column="0" Spacing="2">
+                                        <TextBlock Text="{Binding Title}" FontWeight="SemiBold" Foreground="{DynamicResource AppTextPrimaryBrush}" FontSize="12" />
+                                        <TextBlock Text="{Binding Subtitle}" Foreground="{DynamicResource AppTextTertiaryBrush}" FontSize="11" />
+                                    </StackPanel>
+                                    <Button Grid.Column="1" Content="❌ Отменить" Height="28" Padding="10,0" FontSize="11" Tag="{Binding}" Click="OnCancelEventClicked" />
+                                </Grid>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                    <TextBlock Grid.Row="1" Text="* Отмена подмены или обмена автоматически возвращает базовые смены на свои места." Foreground="{DynamicResource AppTextTertiaryBrush}" FontSize="11" Margin="0,8,0,0" />
+                </Grid>
+            </TabItem>
+
+        </TabControl>
+
+        <!-- НИЗ: КНОПКА ЗАКРЫТИЯ -->
+        <Border Grid.Row="2" Margin="0,14,0,0" Padding="0,12,0,0" BorderBrush="{DynamicResource AppBorderBrush}" BorderThickness="0,1,0,0">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10">
+                <Button x:Name="CloseButton" Content="Готово" Width="110" Height="34" HorizontalContentAlignment="Center" />
+            </StackPanel>
+        </Border>
+
+    </Grid>
+</Window>

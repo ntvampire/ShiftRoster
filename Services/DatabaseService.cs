@@ -174,6 +174,44 @@ public class DatabaseService
                 Key TEXT PRIMARY KEY,
                 Value TEXT
             );
+
+            CREATE TABLE IF NOT EXISTS AbsenceEvents (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ScheduleId INTEGER NOT NULL,
+                PostName TEXT NOT NULL,
+                EmployeeName TEXT NOT NULL,
+                StartDay INTEGER NOT NULL,
+                EndDay INTEGER NOT NULL,
+                AbsenceType TEXT NOT NULL,
+                Notes TEXT
+            );
+
+            CREATE TABLE IF NOT EXISTS ShiftSubstitutions (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ScheduleId INTEGER NOT NULL,
+                PostName TEXT NOT NULL,
+                DayOfMonth INTEGER NOT NULL,
+                ScheduledEmployeeName TEXT NOT NULL,
+                ActualEmployeeName TEXT NOT NULL,
+                IsExternalSubstitute INTEGER NOT NULL DEFAULT 1,
+                ShiftCode TEXT NOT NULL,
+                DayHours REAL NOT NULL,
+                NightHours REAL NOT NULL,
+                TotalHours REAL NOT NULL,
+                ReasonCode TEXT NOT NULL,
+                Notes TEXT
+            );
+
+            CREATE TABLE IF NOT EXISTS ShiftSwaps (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ScheduleId INTEGER NOT NULL,
+                PostName TEXT NOT NULL,
+                Day1 INTEGER NOT NULL,
+                Employee1Name TEXT NOT NULL,
+                Day2 INTEGER NOT NULL,
+                Employee2Name TEXT NOT NULL,
+                Reason TEXT
+            );
         ";
         command.ExecuteNonQuery();
 
@@ -972,5 +1010,268 @@ public class DatabaseService
         }
 
         trans.Commit();
+    }
+
+    // --- Журнал кадровых событий (Отпуска и Больничные) ---
+    public List<AbsenceEvent> GetAbsenceEvents(int scheduleId)
+    {
+        var result = new List<AbsenceEvent>();
+        using var conn = CreateOpenConnection();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = "SELECT Id, ScheduleId, PostName, EmployeeName, StartDay, EndDay, AbsenceType, Notes FROM AbsenceEvents WHERE ScheduleId = @sid ORDER BY StartDay ASC";
+        cmd.Parameters.AddWithValue("@sid", scheduleId);
+        using var reader = cmd.ExecuteReader();
+        while (reader.Read())
+        {
+            result.Add(new AbsenceEvent
+            {
+                Id = reader.GetInt32(0),
+                ScheduleId = reader.GetInt32(1),
+                PostName = reader.GetString(2),
+                EmployeeName = reader.GetString(3),
+                StartDay = reader.GetInt32(4),
+                EndDay = reader.GetInt32(5),
+                AbsenceType = reader.GetString(6),
+                Notes = reader.IsDBNull(7) ? null : reader.GetString(7)
+            });
+        }
+        return result;
+    }
+
+    public void SaveAbsenceEvent(AbsenceEvent evt)
+    {
+        using var conn = CreateOpenConnection();
+        using var cmd = conn.CreateCommand();
+        if (evt.Id > 0)
+        {
+            cmd.CommandText = @"
+                UPDATE AbsenceEvents 
+                SET StartDay = @sd, EndDay = @ed, AbsenceType = @type, Notes = @notes 
+                WHERE Id = @id";
+            cmd.Parameters.AddWithValue("@id", evt.Id);
+        }
+        else
+        {
+            cmd.CommandText = @"
+                INSERT INTO AbsenceEvents (ScheduleId, PostName, EmployeeName, StartDay, EndDay, AbsenceType, Notes)
+                VALUES (@sid, @post, @name, @sd, @ed, @type, @notes);
+                SELECT last_insert_rowid();";
+            cmd.Parameters.AddWithValue("@sid", evt.ScheduleId);
+            cmd.Parameters.AddWithValue("@post", evt.PostName);
+            cmd.Parameters.AddWithValue("@name", evt.EmployeeName);
+        }
+
+        cmd.Parameters.AddWithValue("@sd", evt.StartDay);
+        cmd.Parameters.AddWithValue("@ed", evt.EndDay);
+        cmd.Parameters.AddWithValue("@type", evt.AbsenceType);
+        cmd.Parameters.AddWithValue("@notes", (object?)evt.Notes ?? DBNull.Value);
+
+        if (evt.Id > 0)
+        {
+            cmd.ExecuteNonQuery();
+        }
+        else
+        {
+            evt.Id = Convert.ToInt32(cmd.ExecuteScalar());
+        }
+    }
+
+    public void DeleteAbsenceEvent(int eventId)
+    {
+        using var conn = CreateOpenConnection();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = "DELETE FROM AbsenceEvents WHERE Id = @id";
+        cmd.Parameters.AddWithValue("@id", eventId);
+        cmd.ExecuteNonQuery();
+    }
+
+    public void DeleteAbsenceEventsForEmployee(int scheduleId, string employeeName)
+    {
+        using var conn = CreateOpenConnection();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = "DELETE FROM AbsenceEvents WHERE ScheduleId = @sid AND LOWER(EmployeeName) = LOWER(@name)";
+        cmd.Parameters.AddWithValue("@sid", scheduleId);
+        cmd.Parameters.AddWithValue("@name", employeeName.Trim());
+        cmd.ExecuteNonQuery();
+    }
+
+    // --- Журнал замещений смен (Внешние подменные и Выход штатного в выходной) ---
+    public List<ShiftSubstitution> GetShiftSubstitutions(int scheduleId)
+    {
+        var result = new List<ShiftSubstitution>();
+        using var conn = CreateOpenConnection();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = @"
+            SELECT Id, ScheduleId, PostName, DayOfMonth, ScheduledEmployeeName, ActualEmployeeName,
+                   IsExternalSubstitute, ShiftCode, DayHours, NightHours, TotalHours, ReasonCode, Notes
+            FROM ShiftSubstitutions 
+            WHERE ScheduleId = @sid 
+            ORDER BY DayOfMonth ASC";
+        cmd.Parameters.AddWithValue("@sid", scheduleId);
+        using var reader = cmd.ExecuteReader();
+        while (reader.Read())
+        {
+            result.Add(new ShiftSubstitution
+            {
+                Id = reader.GetInt32(0),
+                ScheduleId = reader.GetInt32(1),
+                PostName = reader.GetString(2),
+                DayOfMonth = reader.GetInt32(3),
+                ScheduledEmployeeName = reader.GetString(4),
+                ActualEmployeeName = reader.GetString(5),
+                IsExternalSubstitute = reader.GetInt32(6) == 1,
+                ShiftCode = reader.GetString(7),
+                DayHours = reader.GetDouble(8),
+                NightHours = reader.GetDouble(9),
+                TotalHours = reader.GetDouble(10),
+                ReasonCode = reader.GetString(11),
+                Notes = reader.IsDBNull(12) ? null : reader.GetString(12)
+            });
+        }
+        return result;
+    }
+
+    public void SaveShiftSubstitution(ShiftSubstitution sub)
+    {
+        using var conn = CreateOpenConnection();
+        using var cmd = conn.CreateCommand();
+        if (sub.Id > 0)
+        {
+            cmd.CommandText = @"
+                UPDATE ShiftSubstitutions 
+                SET DayOfMonth = @day, ScheduledEmployeeName = @sched, ActualEmployeeName = @act,
+                    IsExternalSubstitute = @isExt, ShiftCode = @code, DayHours = @dh, NightHours = @nh,
+                    TotalHours = @th, ReasonCode = @reason, Notes = @notes
+                WHERE Id = @id";
+            cmd.Parameters.AddWithValue("@id", sub.Id);
+        }
+        else
+        {
+            cmd.CommandText = @"
+                INSERT INTO ShiftSubstitutions (
+                    ScheduleId, PostName, DayOfMonth, ScheduledEmployeeName, ActualEmployeeName,
+                    IsExternalSubstitute, ShiftCode, DayHours, NightHours, TotalHours, ReasonCode, Notes
+                ) VALUES (
+                    @sid, @post, @day, @sched, @act, @isExt, @code, @dh, @nh, @th, @reason, @notes
+                );
+                SELECT last_insert_rowid();";
+            cmd.Parameters.AddWithValue("@sid", sub.ScheduleId);
+            cmd.Parameters.AddWithValue("@post", sub.PostName);
+        }
+
+        cmd.Parameters.AddWithValue("@day", sub.DayOfMonth);
+        cmd.Parameters.AddWithValue("@sched", sub.ScheduledEmployeeName);
+        cmd.Parameters.AddWithValue("@act", sub.ActualEmployeeName);
+        cmd.Parameters.AddWithValue("@isExt", sub.IsExternalSubstitute ? 1 : 0);
+        cmd.Parameters.AddWithValue("@code", sub.ShiftCode);
+        cmd.Parameters.AddWithValue("@dh", sub.DayHours);
+        cmd.Parameters.AddWithValue("@nh", sub.NightHours);
+        cmd.Parameters.AddWithValue("@th", sub.TotalHours);
+        cmd.Parameters.AddWithValue("@reason", sub.ReasonCode);
+        cmd.Parameters.AddWithValue("@notes", (object?)sub.Notes ?? DBNull.Value);
+
+        if (sub.Id > 0)
+        {
+            cmd.ExecuteNonQuery();
+        }
+        else
+        {
+            sub.Id = Convert.ToInt32(cmd.ExecuteScalar());
+        }
+    }
+
+    public void DeleteShiftSubstitution(int subId)
+    {
+        using var conn = CreateOpenConnection();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = "DELETE FROM ShiftSubstitutions WHERE Id = @id";
+        cmd.Parameters.AddWithValue("@id", subId);
+        cmd.ExecuteNonQuery();
+    }
+
+    public void DeleteShiftSubstitutionsForSchedule(int scheduleId, string actualName)
+    {
+        using var conn = CreateOpenConnection();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = "DELETE FROM ShiftSubstitutions WHERE ScheduleId = @sid AND LOWER(ActualEmployeeName) = LOWER(@name)";
+        cmd.Parameters.AddWithValue("@sid", scheduleId);
+        cmd.Parameters.AddWithValue("@name", actualName.Trim());
+        cmd.ExecuteNonQuery();
+    }
+
+    // --- Журнал взаимного обмена сменами (Shift Swaps) ---
+    public List<ShiftSwap> GetShiftSwaps(int scheduleId)
+    {
+        var result = new List<ShiftSwap>();
+        using var conn = CreateOpenConnection();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = @"
+            SELECT Id, ScheduleId, PostName, Day1, Employee1Name, Day2, Employee2Name, Reason
+            FROM ShiftSwaps 
+            WHERE ScheduleId = @sid";
+        cmd.Parameters.AddWithValue("@sid", scheduleId);
+        using var reader = cmd.ExecuteReader();
+        while (reader.Read())
+        {
+            result.Add(new ShiftSwap
+            {
+                Id = reader.GetInt32(0),
+                ScheduleId = reader.GetInt32(1),
+                PostName = reader.GetString(2),
+                Day1 = reader.GetInt32(3),
+                Employee1Name = reader.GetString(4),
+                Day2 = reader.GetInt32(5),
+                Employee2Name = reader.GetString(6),
+                Reason = reader.IsDBNull(7) ? null : reader.GetString(7)
+            });
+        }
+        return result;
+    }
+
+    public void SaveShiftSwap(ShiftSwap swap)
+    {
+        using var conn = CreateOpenConnection();
+        using var cmd = conn.CreateCommand();
+        if (swap.Id > 0)
+        {
+            cmd.CommandText = @"
+                UPDATE ShiftSwaps 
+                SET Day1 = @d1, Employee1Name = @e1, Day2 = @d2, Employee2Name = @e2, Reason = @reason
+                WHERE Id = @id";
+            cmd.Parameters.AddWithValue("@id", swap.Id);
+        }
+        else
+        {
+            cmd.CommandText = @"
+                INSERT INTO ShiftSwaps (ScheduleId, PostName, Day1, Employee1Name, Day2, Employee2Name, Reason)
+                VALUES (@sid, @post, @d1, @e1, @d2, @e2, @reason);
+                SELECT last_insert_rowid();";
+            cmd.Parameters.AddWithValue("@sid", swap.ScheduleId);
+            cmd.Parameters.AddWithValue("@post", swap.PostName);
+        }
+
+        cmd.Parameters.AddWithValue("@d1", swap.Day1);
+        cmd.Parameters.AddWithValue("@e1", swap.Employee1Name);
+        cmd.Parameters.AddWithValue("@d2", swap.Day2);
+        cmd.Parameters.AddWithValue("@e2", swap.Employee2Name);
+        cmd.Parameters.AddWithValue("@reason", (object?)swap.Reason ?? DBNull.Value);
+
+        if (swap.Id > 0)
+        {
+            cmd.ExecuteNonQuery();
+        }
+        else
+        {
+            swap.Id = Convert.ToInt32(cmd.ExecuteScalar());
+        }
+    }
+
+    public void DeleteShiftSwap(int swapId)
+    {
+        using var conn = CreateOpenConnection();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = "DELETE FROM ShiftSwaps WHERE Id = @id";
+        cmd.Parameters.AddWithValue("@id", swapId);
+        cmd.ExecuteNonQuery();
     }
 }

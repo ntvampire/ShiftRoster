@@ -105,6 +105,8 @@ public partial class ManageSubstitutesDialog : Window
     private void ClearEditor()
     {
         _selectedSubstitute = null;
+        SubstitutesListBox.SelectedItem = null;
+        SubstitutesListBox.SelectedIndex = -1;
         EditorTitleText.Text = "Новый подменный";
         FullNameTextBox.Text = string.Empty;
         PositionTextBox.Text = "Оператор (подмена)";

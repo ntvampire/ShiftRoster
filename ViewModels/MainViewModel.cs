@@ -31,6 +31,8 @@ public partial class MainViewModel : ViewModelBase
 {
     private ShiftSchedule? _currentSchedule;
 
+    public int CurrentScheduleId => _currentSchedule?.Id ?? 0;
+
     /// <summary>
     /// Событие запроса назначения подменного после назначения больничного/отпуска (из палитры или меню)
     /// </summary>
@@ -230,7 +232,11 @@ public partial class MainViewModel : ViewModelBase
             if (employees.Count > 0)
             {
                 var (baseYear, baseMonth) = DatabaseService.Instance.GetPostBaseMonth(CurrentPostName);
-                if (CurrentPostPattern == "2/2")
+                if (CurrentPostPattern == "1/2")
+                {
+                    cells = RosterCalculationService.Instance.AutoFillOneTwo(_currentSchedule.Id, employees, year, month, baseYear, baseMonth);
+                }
+                else if (CurrentPostPattern == "2/2")
                 {
                     cells = RosterCalculationService.Instance.AutoFillTwoTwo(_currentSchedule.Id, employees, year, month, baseYear, baseMonth);
                 }
@@ -566,7 +572,12 @@ public partial class MainViewModel : ViewModelBase
         var (baseYear, baseMonth) = DatabaseService.Instance.GetPostBaseMonth(CurrentPostName);
 
         List<RosterCell> cells;
-        if (pattern == "2/2")
+        if (pattern == "1/2")
+        {
+            cells = RosterCalculationService.Instance.AutoFillOneTwo(_currentSchedule.Id, employees, CurrentYear, CurrentMonth, baseYear, baseMonth);
+            StatusMessage = "График заполнен по схеме «Сутки через двое» (16ч/8ч, 24ч на пост).";
+        }
+        else if (pattern == "2/2")
         {
             cells = RosterCalculationService.Instance.AutoFillTwoTwo(_currentSchedule.Id, employees, CurrentYear, CurrentMonth, baseYear, baseMonth);
             StatusMessage = "График заполнен по схеме «2 через 2» (по 12ч День/Ночь).";
@@ -720,6 +731,40 @@ public partial class MainViewModel : ViewModelBase
         {
             StatusMessage = $"Подменный «{cleanSubName}» удален из графика за {CurrentMonthName} {CurrentYear} г.";
         }
+    }
+
+    /// <summary>
+    /// Применение всех зарегистрированных кадровых событий (отпуска, больничные, оперативные замещения и обмены)
+    /// с сохранением актуализированных ячеек в БД и обновлением отображения табеля.
+    /// </summary>
+    public void ApplyOperationalEventsAndSave()
+    {
+        if (_currentSchedule == null) return;
+
+        var postEmployees = DatabaseService.Instance.GetEmployees(CurrentPostName);
+        var (baseYear, baseMonth) = DatabaseService.Instance.GetPostBaseMonth(CurrentPostName);
+        int bYear = baseYear > 0 ? baseYear : CurrentYear;
+        int bMonth = baseMonth > 0 ? baseMonth : CurrentMonth;
+
+        var absences = DatabaseService.Instance.GetAbsenceEvents(_currentSchedule.Id);
+        var subs = DatabaseService.Instance.GetShiftSubstitutions(_currentSchedule.Id);
+        var swaps = DatabaseService.Instance.GetShiftSwaps(_currentSchedule.Id);
+
+        var materialized = RosterCalculationService.Instance.BuildMaterializedSchedule(
+            _currentSchedule.Id,
+            postEmployees,
+            CurrentPostPattern,
+            CurrentYear,
+            CurrentMonth,
+            bYear,
+            bMonth,
+            absences,
+            subs,
+            swaps);
+
+        DatabaseService.Instance.SaveRosterCells(_currentSchedule.Id, materialized);
+        LoadMonth(CurrentYear, CurrentMonth);
+        StatusMessage = "Кадровые события и подмены успешно применены к графику.";
     }
 
     /// <summary>

@@ -96,7 +96,13 @@ public partial class SetupWizardDialog : Window
                     pattern = tag;
                 }
 
-                if (pattern == "1/3")
+                if (pattern == "1/2")
+                {
+                    _employees.Add(new WizardEmployeeItem("", "Старший смены", 1, "1/2"));
+                    _employees.Add(new WizardEmployeeItem("", "Дежурный оператор", 2, "1/2"));
+                    _employees.Add(new WizardEmployeeItem("", "Дежурный оператор", 3, "1/2"));
+                }
+                else if (pattern == "1/3")
                 {
                     _employees.Add(new WizardEmployeeItem("", "Старший смены", 1, "1/3"));
                     _employees.Add(new WizardEmployeeItem("", "Дежурный оператор", 2, "1/3"));
