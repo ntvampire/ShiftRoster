@@ -1,0 +1,79 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Release Tag (e.g. v1.0.1)'
+        required: true
+        default: 'v1.0.1'
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    name: Build Installer and Multi-platform Packages
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Install Inno Setup
+        run: choco install innosetup --no-progress -y
+
+      - name: Run Automated Verification Tests
+        run: dotnet run -- --test
+
+      - name: Build Windows x64 (Self-Contained)
+        run: dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o publish/win-x64
+
+      - name: Build Windows x86 (Self-Contained 32-bit)
+        run: dotnet publish -c Release -r win-x86 --self-contained true -p:PublishSingleFile=true -o publish/win-x86
+
+      - name: Build Linux x64 (Self-Contained)
+        run: dotnet publish -c Release -r linux-x64 --self-contained true -p:PublishSingleFile=true -o publish/linux-x64
+
+      - name: Build Windows Installer (Inno Setup)
+        shell: powershell
+        run: |
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer.iss
+
+      - name: Package Portable Distributions
+        shell: powershell
+        run: |
+          # 1. Windows x64 Portable
+          Compress-Archive -Path "publish\win-x64\*" -DestinationPath "publish\ShiftRoster-win-x64.zip" -Force
+
+          # 2. Windows x86 Portable
+          Compress-Archive -Path "publish\win-x86\*" -DestinationPath "publish\ShiftRoster-win-x86.zip" -Force
+
+          # 3. Linux x64 Portable Tar.Gz
+          tar -czf "publish\ShiftRoster-linux-x64.tar.gz" -C "publish\linux-x64" .
+
+          Get-ChildItem publish
+
+      - name: Publish Release to GitHub
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.tag_name || github.ref_name }}
+          name: "ShiftRoster ${{ inputs.tag_name || github.ref_name }}"
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          files: |
+            publish/installer/ShiftRoster-Setup.exe
+            publish/ShiftRoster-win-x64.zip
+            publish/ShiftRoster-win-x86.zip
+            publish/ShiftRoster-linux-x64.tar.gz
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
