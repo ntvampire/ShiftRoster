@@ -24,6 +24,7 @@ sealed class Program
             if (args.Contains("--test"))
             {
                 VerificationTests.RunAllTests();
+                Environment.Exit(0);
                 return;
             }
 
@@ -31,6 +32,11 @@ sealed class Program
         }
         catch (Exception ex)
         {
+            if (args.Contains("--test"))
+            {
+                Console.Error.WriteLine($"\n[ТЕСТ ПРОВАЛЕН]: {ex.Message}\n{ex.StackTrace}");
+                Environment.Exit(1);
+            }
             HandleFatalException(ex);
         }
     }

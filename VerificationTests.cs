@@ -459,7 +459,6 @@ public static class VerificationTests
         var flyoutWindow = new ShiftRoster.Views.MainWindow();
         var flyoutVm = new ShiftRoster.ViewModels.MainViewModel();
         flyoutWindow.DataContext = flyoutVm;
-        flyoutWindow.Show();
 
         var flyoutBtn = new Avalonia.Controls.Button { Width = 50, Height = 50 };
         var flyoutCell = new ShiftRoster.ViewModels.RosterCellViewModel(new ShiftRoster.Models.RosterCell { DayOfMonth = 1, EmployeeName = "Иванов" }, 2026, 10);
@@ -480,6 +479,7 @@ public static class VerificationTests
             new Avalonia.Input.PointerPointProperties(Avalonia.Input.RawInputModifiers.RightMouseButton, Avalonia.Input.PointerUpdateKind.RightButtonPressed),
             Avalonia.Input.KeyModifiers.None);
         flyoutWindow.OnCellPointerPressed(flyoutBtn, pPressed2);
+        flyoutWindow.Close();
 
         Console.WriteLine("[УСПЕХ] (FAMenuFlyout открывается стабильно без ошибок)");
 
