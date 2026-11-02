@@ -69,11 +69,25 @@ jobs:
           tar -czf "publish\ShiftRoster-linux-x64.tar.gz" -C "publish\linux-x64" .
           Get-ChildItem publish
 
+      - name: Prepare Release Notes
+        shell: powershell
+        run: |
+          if (-not (Test-Path "RELEASE_NOTES.md")) {
+              $tag = "${{ inputs.tag_name || github.ref_name }}"
+              $tagMsg = git tag -l --format='%(contents)' $tag
+              if (-not [string]::IsNullOrWhiteSpace($tagMsg)) {
+                  $tagMsg | Out-File -FilePath "RELEASE_NOTES.md" -Encoding utf8
+              } else {
+                  Set-Content -Path "RELEASE_NOTES.md" -Value ""
+              }
+          }
+
       - name: Publish Release to GitHub
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ inputs.tag_name || github.ref_name }}
           name: "ShiftRoster ${{ inputs.tag_name || github.ref_name }}"
+          body_path: RELEASE_NOTES.md
           draft: false
           prerelease: false
           generate_release_notes: true
