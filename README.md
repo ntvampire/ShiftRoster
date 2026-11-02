@@ -50,17 +50,16 @@ dotnet run -- --test
 ```
 
 ### Автоматическая сборка релизов и инсталлятора на GitHub (CI/CD):
-Сборка инсталлятора и всех релизных архивов автоматизирована через GitHub Actions (`.github/workflows/build-and-release.yml`).
+Сборка инсталлятора и релизных пакетов автоматизирована через GitHub Actions (`.github/workflows/build-and-release.yml`).
 Локально выполняются только разработка и тестирование (`dotnet run -- --test`).
 Для создания нового релиза в облаке достаточно запушить тег:
 ```powershell
-git tag v1.0.1
-git push origin v1.0.1
+git tag v1.0.2
+git push origin v1.0.2
 ```
 GitHub Actions автоматически:
 1. Запустит все 21 комплексный тест верификации.
 2. Соберет исполняемые файлы под Windows x64, Windows x86 и Linux x64.
-3. Скомпилирует русскоязычный инсталлятор `ShiftRoster-Setup.exe` (Inno Setup).
-4. Упакует портабельные архивы (`.zip` и `.tar.gz`) и прикрепит все 4 файла к релизу на GitHub.
-  dotnet publish -c Release -r linux-x64 --self-contained true -p:PublishSingleFile=true -o publish\linux-x64
-  ```
+3. Скомпилирует единый универсальный инсталлятор `ShiftRoster-Setup.exe` (Inno Setup с автоопределением разрядности Windows x86/x64).
+4. Упакует портативный архив `ShiftRoster-linux-x64.tar.gz` для Linux.
+5. Прикрепит 2 итоговых файла к релизу на GitHub.

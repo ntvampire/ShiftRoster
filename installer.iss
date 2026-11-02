@@ -1,7 +1,9 @@
-; Скрипт создания установщика ShiftRoster для Windows 7, 8, 10, 11 (Inno Setup)
+; Скрипт создания универсального установщика ShiftRoster для Windows x86 и x64 (Inno Setup)
 #define MyAppName "ShiftRoster"
 #define MyAppUserTitle "График смен"
-#define MyAppVersion "1.0.1"
+#ifndef MyAppVersion
+#define MyAppVersion "1.0.2"
+#endif
 #define MyAppPublisher "ShiftRoster Development"
 #define MyAppExeName "ShiftRoster.exe"
 
@@ -30,7 +32,10 @@ Name: "russian"; MessagesFile: "compiler:Languages\Russian.isl"
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"
 
 [Files]
-Source: "publish\win-x64\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "*.db,*.pdb,*.log,Backups,Exports"
+; Для 64-битных систем (x64)
+Source: "publish\win-x64\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "*.db,*.pdb,*.log,Backups,Exports"; Check: Is64BitInstallMode
+; Для 32-битных систем (x86)
+Source: "publish\win-x86\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "*.db,*.pdb,*.log,Backups,Exports"; Check: not Is64BitInstallMode
 
 [Icons]
 Name: "{group}\{#MyAppUserTitle}"; Filename: "{app}\{#MyAppExeName}"
