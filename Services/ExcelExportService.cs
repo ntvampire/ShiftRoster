@@ -291,8 +291,8 @@ public class ExcelExportService
             cell.Value = headers[col];
             cell.Style.Font.Bold = true;
             cell.Style.Font.FontSize = 10;
-            cell.Style.Fill.BackgroundColor = XLColor.FromHtml("#2B3A4A");
-            cell.Style.Font.FontColor = XLColor.White;
+            cell.Style.Fill.BackgroundColor = XLColor.FromHtml("#EAEAEA");
+            cell.Style.Font.FontColor = XLColor.Black;
             cell.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
             cell.Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
             cell.Style.Alignment.WrapText = true;
