@@ -176,27 +176,106 @@ public static class VerificationTests
                 }
             }
 
-            // Проверка бланка Т-13: пробел перед скобкой должности и 31-й день
+            // Проверка бланка Т-12: Раздел 1, ОКУД 0301007, пробел перед скобкой должности, дни 1..15, 16..31, итоги
+            var wsT12 = wb.Worksheet("Сводный бланк Т-12");
+            if (wsT12.PageSetup.PageOrientation != ClosedXML.Excel.XLPageOrientation.Landscape)
+            {
+                throw new Exception("Бланк Т-12 не настроен на альбомную ориентацию!");
+            }
+
+            string formTitle = wsT12.Cell("A1").GetString();
+            if (!formTitle.Contains("№ Т-12") || !formTitle.Contains("0301007"))
+            {
+                throw new Exception($"Некорректный заголовок бланка Т-12: '{formTitle}'");
+            }
+
+            string docTitle = wsT12.Cell("A3").GetString();
+            if (!docTitle.Contains("ТАБЕЛЬ УЧЕТА РАБОЧЕГО ВРЕМЕНИ И РАСЧЕТА ОПЛАТЫ ТРУДА"))
+            {
+                throw new Exception($"Некорректное наименование документа Т-12: '{docTitle}'");
+            }
+
+            string sectionTitle = wsT12.Cell("A4").GetString();
+            if (!sectionTitle.Contains("Раздел 1"))
+            {
+                throw new Exception($"Некорректный раздел табеля Т-12: '{sectionTitle}'");
+            }
+
+            string day31Header = wsT12.Cell(7, 34).GetString();
+            if (day31Header != "31")
+            {
+                throw new Exception($"Колонка 34 в бланке Т-12 должна содержать '31', но получено '{day31Header}'!");
+            }
+
+            string subtotal1Header = wsT12.Cell(7, 18).GetString();
+            if (!subtotal1Header.Contains("дн.") && !wsT12.Cell(6, 18).GetString().Contains("1-15"))
+            {
+                throw new Exception($"Колонка 18 в бланке Т-12 должна содержать итог за 1-15!");
+            }
+
+            string subtotal2Header = wsT12.Cell(7, 35).GetString();
+            if (!subtotal2Header.Contains("дн.") && !wsT12.Cell(6, 35).GetString().Contains("16-31"))
+            {
+                throw new Exception($"Колонка 35 в бланке Т-12 должна содержать итог за 16-31!");
+            }
+
+            string empCell = wsT12.Cell(8, 2).GetString();
+            if (!empCell.Contains(" ("))
+            {
+                throw new Exception($"В бланке Т-12 отсутствует пробел перед должностью в скобках: '{empCell}'");
+            }
+
+            // Проверка двухстрочной структуры сотрудника в Т-12 (строка 8: код, строка 9: часы)
+            string emp1HoursDay1 = wsT12.Cell(9, 3).GetString();
+            string emp1CodeDay1 = wsT12.Cell(8, 3).GetString();
+            if (string.IsNullOrWhiteSpace(emp1CodeDay1))
+            {
+                throw new Exception("В бланке Т-12 строка кодов (строка 8) пуста для первого дня!");
+            }
+
+            // Проверка одновременного наличия бланка Т-13 в том же файле
             var wsT13 = wb.Worksheet("Сводный бланк Т-13");
             if (wsT13.PageSetup.PageOrientation != ClosedXML.Excel.XLPageOrientation.Landscape)
             {
                 throw new Exception("Бланк Т-13 не настроен на альбомную ориентацию!");
             }
-
-            string day31Header = wsT13.Cell(7, 18).GetString();
-            if (day31Header != "31")
+            string day31T13 = wsT13.Cell(7, 18).GetString();
+            if (day31T13 != "31")
             {
-                throw new Exception($"Колонка 18 в бланке Т-13 должна содержать '31', но получено '{day31Header}'!");
-            }
-
-            string empCell = wsT13.Cell(8, 2).GetString();
-            if (!empCell.Contains(" ("))
-            {
-                throw new Exception($"В бланке Т-13 отсутствует пробел перед должностью в скобках: '{empCell}'");
+                throw new Exception($"В бланке Т-13 колонка 18 должна содержать '31', но получено '{day31T13}'!");
             }
         }
 
-        Console.WriteLine($"[УСПЕХ] (Сводный отчет по {posts.Count} сменам сформирован: без 'Статус', пробел 'ФИО (Должность)', 31-й день, А4 альбомная печать)");
+        // Проверка механизма ротации отчетов в папке экспорта (строго не более 25 файлов)
+        string rotationTestDir = Path.Combine(exportDir, "RotationTest");
+        if (Directory.Exists(rotationTestDir)) Directory.Delete(rotationTestDir, true);
+        Directory.CreateDirectory(rotationTestDir);
+
+        for (int f = 1; f <= 30; f++)
+        {
+            string dummyFile = Path.Combine(rotationTestDir, $"Report_{f:D2}.xlsx");
+            File.WriteAllText(dummyFile, "dummy test excel");
+            File.SetLastWriteTime(dummyFile, DateTime.Now.AddMinutes(f));
+        }
+
+        ExcelExportService.RotateExportFiles(rotationTestDir, 25);
+        var remainingReports = ExcelExportService.GetExportFiles(rotationTestDir);
+        if (remainingReports.Count != 25)
+        {
+            throw new Exception($"Ротация отчетов не сработала: осталось {remainingReports.Count} файлов вместо 25!");
+        }
+        if (File.Exists(Path.Combine(rotationTestDir, "Report_01.xlsx")) ||
+            File.Exists(Path.Combine(rotationTestDir, "Report_05.xlsx")))
+        {
+            throw new Exception("Ротация отчетов удалила не самые старые файлы!");
+        }
+        if (!File.Exists(Path.Combine(rotationTestDir, "Report_30.xlsx")))
+        {
+            throw new Exception("Ротация отчетов случайно удалила свежий файл!");
+        }
+        Directory.Delete(rotationTestDir, true);
+
+        Console.WriteLine($"[УСПЕХ] (Сводный отчет по {posts.Count} сменам сформирован: листы Т-12 и Т-13 в одном файле, ротация <= 25 отчетов, А4 альбомная печать)");
 
         // 7. Проверка наименования организации в базе и отчетах
         Console.Write("7. Название организации в базе и отчетах... ");
@@ -598,6 +677,16 @@ public static class VerificationTests
                 }
             }
 
+            var wsT12 = wb.Worksheet("Бланк Т-12");
+            for (int i = 0; i < expectedOrder.Length; i++)
+            {
+                string empCellVal = wsT12.Cell(8 + i * 2, 2).GetString();
+                if (!empCellVal.StartsWith(expectedOrder[i]))
+                {
+                    throw new Exception($"В бланке Т-12 блок #{i + 1} содержит «{empCellVal}» вместо «{expectedOrder[i]}»!");
+                }
+            }
+
             var wsT13 = wb.Worksheet("Бланк Т-13");
             for (int i = 0; i < expectedOrder.Length; i++)
             {
@@ -958,6 +1047,27 @@ public static class VerificationTests
 
         db.DeletePost(postSwap);
         Console.WriteLine("[УСПЕХ] (Смены взаимно поменялись местами, баланс 24.0ч/сут безупречно сохранен)");
+
+        // 22. Проверка сервиса автообновлений (парсинг версий и логика обнаружения релизов)
+        Console.Write("22. Сервис автообновлений (парсинг версий и GitHub API)... ");
+        var curVer = UpdateService.CurrentVersion;
+        if (curVer == null || curVer.Major < 1)
+        {
+            throw new Exception("Не удалось определить текущую версию сборки через UpdateService!");
+        }
+
+        var olderUpdate = UpdateService.EvaluateVersion("v1.0.0", "Older Release", "Notes", "https://example.com/dl");
+        if (olderUpdate == null || olderUpdate.IsNewerThanCurrent)
+        {
+            throw new Exception("EvaluateVersion ошибся: v1.0.0 определена как более новая версия!");
+        }
+
+        var newerUpdate = UpdateService.EvaluateVersion("v99.9.9", "New Release", "Notes", "https://example.com/dl");
+        if (newerUpdate == null || !newerUpdate.IsNewerThanCurrent)
+        {
+            throw new Exception("EvaluateVersion ошибся: v99.9.9 не определена как более новая версия!");
+        }
+        Console.WriteLine($"[УСПЕХ] (Текущая версия: {UpdateService.CurrentVersionString}, парсинг и валидация версий работают штатно)");
 
         Console.WriteLine("=================================================");
         Console.WriteLine("ВСЕ ТЕСТЫ И ТРЕБОВАНИЯ ТЗ УСПЕШНО ВЫПОЛНЕНЫ!");

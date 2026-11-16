@@ -877,7 +877,7 @@ public partial class MainViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// Экспорт табеля в Excel (Т-13 и сводка для 1С)
+    /// Экспорт табеля в Excel (Т-12, Т-13 и сводка для 1С)
     /// </summary>
     public string ExportToExcel(string? targetFilePath = null)
     {

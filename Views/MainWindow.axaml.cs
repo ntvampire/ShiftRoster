@@ -3,10 +3,13 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.Media;
 using FluentAvalonia.UI.Controls;
 using ShiftRoster.Services;
 using ShiftRoster.ViewModels;
@@ -225,6 +228,125 @@ public partial class MainWindow : Window
             if (vm.ShouldRunWizardOnStartup)
             {
                 await OpenSetupWizardAsync(vm);
+            }
+
+            // Фоновый автопоиск обновлений из GitHub Releases при старте приложения
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await Task.Delay(2500);
+                    var update = await UpdateService.Instance.CheckForUpdatesAsync();
+                    if (update != null && update.IsNewerThanCurrent)
+                    {
+                        await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(async () =>
+                        {
+                            await ShowUpdateNotificationAsync(update);
+                        });
+                    }
+                }
+                catch
+                {
+                    // Бесшумный режим при отсутствии интернета или таймаутах
+                }
+            });
+        }
+    }
+
+    private async Task ShowUpdateNotificationAsync(UpdateInfo update)
+    {
+        if (DataContext is not MainViewModel vm) return;
+
+        var panel = new StackPanel { Spacing = 10, Margin = new Thickness(0, 4, 0, 0) };
+        panel.Children.Add(new TextBlock
+        {
+            Text = $"Вышла новая версия {update.VersionTag} (у вас установлена {UpdateService.CurrentVersionString}).",
+            FontWeight = FontWeight.Bold,
+            FontSize = 13
+        });
+
+        if (!string.IsNullOrWhiteSpace(update.ReleaseNotes))
+        {
+            panel.Children.Add(new TextBlock
+            {
+                Text = "Что нового:",
+                FontWeight = FontWeight.SemiBold,
+                FontSize = 12
+            });
+
+            var scroll = new ScrollViewer
+            {
+                MaxHeight = 160,
+                Content = new TextBlock
+                {
+                    Text = update.ReleaseNotes,
+                    TextWrapping = TextWrapping.Wrap,
+                    FontSize = 11.5,
+                    Opacity = 0.9
+                }
+            };
+            panel.Children.Add(scroll);
+        }
+
+        panel.Children.Add(new TextBlock
+        {
+            Text = "Желаете загрузить и установить обновление прямо сейчас?",
+            FontStyle = FontStyle.Italic,
+            FontSize = 12
+        });
+
+        var dialog = new ContentDialog
+        {
+            Title = "Доступно обновление ShiftRoster",
+            Content = panel,
+            PrimaryButtonText = "Обновить сейчас",
+            CloseButtonText = "Позже",
+            DefaultButton = ContentDialogButton.Primary
+        };
+
+        var result = await dialog.ShowAsync();
+        if (result == ContentDialogResult.Primary && !string.IsNullOrWhiteSpace(update.DownloadUrl))
+        {
+            vm.StatusMessage = $"Загрузка обновления {update.VersionTag}...";
+            try
+            {
+                var progressDialog = new ContentDialog
+                {
+                    Title = "Загрузка обновления",
+                    Content = new TextBlock { Text = $"Загрузка установочного пакета {update.VersionTag}...", Margin = new Thickness(0, 10) },
+                    CloseButtonText = "Отмена"
+                };
+
+                var cts = new CancellationTokenSource();
+                progressDialog.Closed += (_, _) => cts.Cancel();
+
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        var prog = new Progress<int>(pct =>
+                        {
+                            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                            {
+                                vm.StatusMessage = $"Загрузка обновления: {pct}%";
+                            });
+                        });
+                        await UpdateService.Instance.DownloadAndLaunchInstallerAsync(update.DownloadUrl, prog, cts.Token);
+                    }
+                    catch (Exception ex) when (!cts.IsCancellationRequested)
+                    {
+                        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                        {
+                            vm.StatusMessage = $"Ошибка загрузки обновления: {ex.Message}";
+                        });
+                    }
+                });
+
+                await progressDialog.ShowAsync();
+            }
+            catch (Exception ex)
+            {
+                vm.StatusMessage = $"Не удалось запустить обновление: {ex.Message}";
             }
         }
     }

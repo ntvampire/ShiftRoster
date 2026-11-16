@@ -2,7 +2,7 @@
 #define MyAppName "ShiftRoster"
 #define MyAppUserTitle "График смен"
 #ifndef MyAppVersion
-#define MyAppVersion "1.0.3"
+#define MyAppVersion "1.0.4"
 #endif
 #define MyAppPublisher "ShiftRoster Development"
 #define MyAppExeName "ShiftRoster.exe"

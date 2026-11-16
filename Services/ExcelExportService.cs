@@ -9,10 +9,10 @@ namespace ShiftRoster.Services;
 
 /// <summary>
 /// Сервис экспорта графика и табеля в Excel (ClosedXML).
-/// Формирует унифицированный бланк Т-13 и сводную ведомость для быстрого ручного ввода в 1С.
+/// Формирует унифицированный бланк Т-12 и сводную ведомость для быстрого ручного ввода в 1С.
 /// Поддерживает сводный отчет по нескольким сменам/постам сразу.
 /// Табельные номера и колонка «Статус» исключены согласно требованиям ТЗ.
-/// Все листы оптимизированы под печать на 1 листе А4 в альбомной ориентации.
+/// Все листы оптимизированы под печать на листе А4 в альбомной ориентации.
 /// </summary>
 public class ExcelExportService
 {
@@ -22,6 +22,8 @@ public class ExcelExportService
     /// <summary>
     /// Экспорт одной конкретной смены/поста.
     /// Возвращает фактический путь к сохраненному файлу (с защитой от блокировки файла Excel).
+    /// Включает листы: «Сводка для 1С», «Бланк Т-12» и «Бланк Т-13».
+    /// Автоматически производит ротацию отчетов (не более 25 файлов).
     /// </summary>
     public string ExportRosterToExcel(
         string filePath,
@@ -35,16 +37,22 @@ public class ExcelExportService
         // 1. Лист «Сводка для оператора 1С» (удобный для ручного переноса)
         Create1CSummarySheet(workbook, schedule, summaries, "Сводка для 1С");
 
-        // 2. Лист «Бланк Т-13 (Печатный табель)» (официальная форма)
+        // 2. Лист «Бланк Т-12 (Печатный табель)» (официальная форма Т-12)
+        CreateT12Sheet(workbook, schedule, cells, summaries, "Бланк Т-12");
+
+        // 3. Лист «Бланк Т-13 (Печатный табель)» (официальная форма Т-13)
         CreateT13Sheet(workbook, schedule, cells, summaries, "Бланк Т-13");
 
         workbook.SaveAs(actualPath);
+        RotateExportFiles(Path.GetDirectoryName(actualPath), 25);
         return actualPath;
     }
 
     /// <summary>
     /// Экспорт общего сводного отчета по всем сменам/постам предприятия сразу.
     /// Возвращает фактический путь к сохраненному файлу.
+    /// Включает общую сводку, индивидуальные листы смен, а также сводные бланки Т-12 и Т-13.
+    /// Автоматически производит ротацию отчетов (не более 25 файлов).
     /// </summary>
     public string ExportConsolidatedRosterToExcel(
         string filePath,
@@ -65,10 +73,14 @@ public class ExcelExportService
             Create1CSummarySheet(workbook, schedule, summaries, cleanSheetName);
         }
 
-        // 3. Сводный бланк Т-13 по всем сменам предприятия
+        // 3. Сводный бланк Т-12 по всем сменам предприятия
+        CreateConsolidatedT12Sheet(workbook, year, month, postDataList);
+
+        // 4. Сводный бланк Т-13 по всем сменам предприятия
         CreateConsolidatedT13Sheet(workbook, year, month, postDataList);
 
         workbook.SaveAs(actualPath);
+        RotateExportFiles(Path.GetDirectoryName(actualPath), 25);
         return actualPath;
     }
 
@@ -347,6 +359,341 @@ public class ExcelExportService
     }
 
     /// <summary>
+    /// Создание сводного бланка Т-12 по всем сменам сразу (безопасное объединение без дублирования)
+    /// </summary>
+    private void CreateConsolidatedT12Sheet(
+        XLWorkbook workbook,
+        int year,
+        int month,
+        List<(ShiftSchedule Schedule, List<RosterCell> Cells, List<EmployeeMonthSummary> Summaries)> postDataList)
+    {
+        var allCells = postDataList.SelectMany(p => p.Cells).ToList();
+        var allSummaries = postDataList.SelectMany(p => p.Summaries).ToList();
+        var virtualSchedule = new ShiftSchedule
+        {
+            Year = year,
+            Month = month,
+            PostName = "Все подразделения предприятия"
+        };
+
+        CreateT12Sheet(workbook, virtualSchedule, allCells, allSummaries, "Сводный бланк Т-12");
+    }
+
+    /// <summary>
+    /// Создание листа с унифицированной формой Т-12 (печать табеля учета рабочего времени).
+    /// Раздел 1 «Учет рабочего времени» согласно Постановлению Госкомстата РФ от 05.01.2004 № 1 (ОКУД 0301007).
+    /// Дни месяца 1..15 и 16..31 развернуты по горизонтали с промежуточными итогами.
+    /// Форматирование под альбомную печать.
+    /// Пробел между ФИО и должностью в скобках.
+    /// </summary>
+    private void CreateT12Sheet(XLWorkbook workbook, ShiftSchedule schedule, List<RosterCell> cells, List<EmployeeMonthSummary> summaries, string sheetName)
+    {
+        var ws = workbook.Worksheets.Add(sheetName);
+        ws.ShowGridLines = true;
+        ApplyA4LandscapePageSetup(ws);
+
+        string orgName = DatabaseService.Instance.GetOrganizationName();
+        int daysInMonth = DateTime.DaysInMonth(schedule.Year, schedule.Month);
+        const int totalCols = 40;
+
+        ws.Cell("A1").Value = "Унифицированная форма № Т-12\nУтверждена Постановлением Госкомстата России от 05.01.2004 № 1\nКод по ОКУД 0301007";
+        ws.Cell("A1").Style.Font.FontSize = 8;
+        ws.Cell("A1").Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Right;
+        ws.Cell("A1").Style.Alignment.WrapText = true;
+        ws.Range(1, 1, 1, totalCols).Merge();
+        ws.Row(1).Height = 30;
+
+        ws.Cell("A2").Value = $"Организация: {(!string.IsNullOrWhiteSpace(orgName) ? orgName : "________________")}";
+        ws.Cell("A2").Style.Font.Bold = true;
+        ws.Cell("A2").Style.Font.FontSize = 11;
+        ws.Range(2, 1, 2, totalCols).Merge();
+
+        ws.Cell("A3").Value = "ТАБЕЛЬ УЧЕТА РАБОЧЕГО ВРЕМЕНИ И РАСЧЕТА ОПЛАТЫ ТРУДА";
+        ws.Cell("A3").Style.Font.Bold = true;
+        ws.Cell("A3").Style.Font.FontSize = 12;
+        ws.Cell("A3").Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+        ws.Range(3, 1, 3, totalCols).Merge();
+
+        ws.Cell("A4").Value = "Раздел 1. Учет рабочего времени";
+        ws.Cell("A4").Style.Font.Bold = true;
+        ws.Cell("A4").Style.Font.FontSize = 10;
+        ws.Cell("A4").Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+        ws.Range(4, 1, 4, totalCols).Merge();
+
+        ws.Cell("A5").Value = $"Подразделение/Участок: {schedule.PostName}  |  Период: с 01.{schedule.Month:D2}.{schedule.Year} по {daysInMonth:D2}.{schedule.Month:D2}.{schedule.Year}";
+        ws.Cell("A5").Style.Font.FontSize = 9;
+        ws.Cell("A5").Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+        ws.Range(5, 1, 5, totalCols).Merge();
+
+        int startRow = 6;
+        ws.Cell(startRow, 1).Value = "№ п/п";
+        ws.Range(startRow, 1, startRow + 1, 1).Merge();
+
+        ws.Cell(startRow, 2).Value = "Фамилия, инициалы, должность";
+        ws.Range(startRow, 2, startRow + 1, 2).Merge();
+
+        // Графа 4: Дни 1..15
+        ws.Cell(startRow, 3).Value = "Отметки о явках и неявках на работу по числам месяца (1-15)";
+        ws.Range(startRow, 3, startRow, 17).Merge();
+        for (int d = 1; d <= 15; d++)
+        {
+            ws.Cell(startRow + 1, 2 + d).Value = d.ToString();
+        }
+
+        // Графа 5: Итого за 1-15
+        ws.Cell(startRow, 18).Value = "Итого за\n1-15";
+        ws.Cell(startRow + 1, 18).Value = "дн. / ч.";
+
+        // Графа 6: Дни 16..31
+        ws.Cell(startRow, 19).Value = "Отметки о явках и неявках на работу по числам месяца (16-31)";
+        ws.Range(startRow, 19, startRow, 34).Merge();
+        for (int d = 16; d <= 31; d++)
+        {
+            int colIdx = 18 + (d - 15);
+            ws.Cell(startRow + 1, colIdx).Value = d.ToString();
+        }
+
+        // Графа 7: Итого за 16-31
+        ws.Cell(startRow, 35).Value = "Итого за\n16-31";
+        ws.Cell(startRow + 1, 35).Value = "дн. / ч.";
+
+        // Графы 8-13: Отработано за месяц
+        ws.Cell(startRow, 36).Value = "Отработано за месяц";
+        ws.Range(startRow, 36, startRow, 39).Merge();
+        ws.Cell(startRow + 1, 36).Value = "Всего дней";
+        ws.Cell(startRow + 1, 37).Value = "Всего часов";
+        ws.Cell(startRow + 1, 38).Value = "В т.ч. ночных";
+        ws.Cell(startRow + 1, 39).Value = "В т.ч. праздн.";
+
+        // Графа 17: Выходных дней
+        ws.Cell(startRow, 40).Value = "Выходных\nдней";
+        ws.Range(startRow, 40, startRow + 1, 40).Merge();
+
+        var headerRange = ws.Range(startRow, 1, startRow + 1, totalCols);
+        headerRange.Style.Font.Bold = true;
+        headerRange.Style.Font.FontSize = 8.5;
+        headerRange.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+        headerRange.Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
+        headerRange.Style.Alignment.WrapText = true;
+        headerRange.Style.Fill.BackgroundColor = XLColor.FromHtml("#E0E0E0");
+        headerRange.Style.Border.InsideBorder = XLBorderStyleValues.Thin;
+        headerRange.Style.Border.OutsideBorder = XLBorderStyleValues.Medium;
+
+        int currentRow = startRow + 2;
+
+        // Фиксируем строгий порядок сотрудников согласно ведомости сводки (без алфавитной сортировки!):
+        // сначала постоянные работники в порядке внесения в смену, затем подменные по порядку назначения
+        var summaryOrderMap = new Dictionary<string, int>();
+        int sIdx = 0;
+        foreach (var s in summaries)
+        {
+            if (!summaryOrderMap.ContainsKey(s.EmployeeName))
+            {
+                summaryOrderMap[s.EmployeeName] = sIdx++;
+            }
+        }
+
+        var cellOrderMap = new Dictionary<string, int>();
+        for (int i = 0; i < cells.Count; i++)
+        {
+            if (!cellOrderMap.ContainsKey(cells[i].EmployeeName))
+            {
+                cellOrderMap[cells[i].EmployeeName] = i;
+            }
+        }
+
+        var empGroups = cells.GroupBy(c => c.EmployeeName)
+            .OrderBy(g => summaryOrderMap.TryGetValue(g.Key, out int idx) ? idx : 999)
+            .ThenBy(g => g.First().IsSubstitute ? 1 : 0)
+            .ThenBy(g => cellOrderMap.TryGetValue(g.Key, out int cIdx) ? cIdx : 999);
+        int order = 1;
+
+        foreach (var group in empGroups)
+        {
+            var empName = group.Key;
+            var firstCell = group.First();
+            string position = !string.IsNullOrWhiteSpace(firstCell.Position) ? firstCell.Position : "Оператор";
+
+            // Безопасное формирование словаря ячеек по дням (исключает System.ArgumentException при дублях)
+            var dayCellsGroup = group.GroupBy(c => c.DayOfMonth)
+                                     .ToDictionary(g => g.Key, g => g.ToList());
+
+            var matchingSummaries = summaries.Where(s => s.EmployeeName == empName).ToList();
+
+            // 1. № п/п
+            ws.Cell(currentRow, 1).Value = order++;
+            ws.Range(currentRow, 1, currentRow + 1, 1).Merge();
+            ws.Cell(currentRow, 1).Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
+            ws.Cell(currentRow, 1).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+
+            // 2. ФИО и должность в скобках С ОБЯЗАТЕЛЬНЫМ ПРОБЕЛОМ: «Иванов И.И. (Оператор)»
+            ws.Cell(currentRow, 2).Value = $"{empName} ({position})";
+            ws.Range(currentRow, 2, currentRow + 1, 2).Merge();
+            ws.Cell(currentRow, 2).Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
+            ws.Cell(currentRow, 2).Style.Alignment.WrapText = true;
+            ws.Cell(currentRow, 2).Style.Font.Bold = true;
+            ws.Cell(currentRow, 2).Style.Font.FontSize = 8.5;
+
+            // 3. Первая половина месяца: дни 1..15 (колонки 3..17)
+            double half1Hours = 0;
+            int half1Days = 0;
+            for (int d = 1; d <= 15; d++)
+            {
+                int colIdx = 2 + d;
+                if (dayCellsGroup.TryGetValue(d, out var dayList))
+                {
+                    var primaryCell = dayList.OrderByDescending(c => c.TotalHours).First();
+                    double totalH = dayList.Sum(c => c.TotalHours);
+                    ws.Cell(currentRow, colIdx).Value = GetT12Code(primaryCell);
+                    ws.Cell(currentRow + 1, colIdx).Value = totalH > 0 ? totalH.ToString("0.#") : "";
+                    if (totalH > 0)
+                    {
+                        half1Hours += totalH;
+                        half1Days++;
+                    }
+                }
+                else
+                {
+                    ws.Cell(currentRow, colIdx).Value = "В";
+                    ws.Cell(currentRow + 1, colIdx).Value = "";
+                }
+                ws.Cell(currentRow, colIdx).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+                ws.Cell(currentRow + 1, colIdx).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+            }
+
+            // 4. Итого за 1-15 (Колонка 18): верхняя строка — дней, нижняя — часов
+            ws.Cell(currentRow, 18).Value = half1Days > 0 ? half1Days.ToString() : "0";
+            ws.Cell(currentRow + 1, 18).Value = half1Hours > 0 ? half1Hours.ToString("0.#") : "0";
+            ws.Cell(currentRow, 18).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+            ws.Cell(currentRow + 1, 18).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+            ws.Cell(currentRow, 18).Style.Font.Bold = true;
+            ws.Cell(currentRow + 1, 18).Style.Font.Bold = true;
+
+            // 5. Вторая половина месяца: дни 16..31 (колонки 19..34)
+            double half2Hours = 0;
+            int half2Days = 0;
+            for (int d = 16; d <= 31; d++)
+            {
+                int colIdx = 18 + (d - 15);
+                if (d <= daysInMonth)
+                {
+                    if (dayCellsGroup.TryGetValue(d, out var dayList))
+                    {
+                        var primaryCell = dayList.OrderByDescending(c => c.TotalHours).First();
+                        double totalH = dayList.Sum(c => c.TotalHours);
+                        ws.Cell(currentRow, colIdx).Value = GetT12Code(primaryCell);
+                        ws.Cell(currentRow + 1, colIdx).Value = totalH > 0 ? totalH.ToString("0.#") : "";
+                        if (totalH > 0)
+                        {
+                            half2Hours += totalH;
+                            half2Days++;
+                        }
+                    }
+                    else
+                    {
+                        ws.Cell(currentRow, colIdx).Value = "В";
+                        ws.Cell(currentRow + 1, colIdx).Value = "";
+                    }
+                }
+                else
+                {
+                    ws.Cell(currentRow, colIdx).Value = "X";
+                    ws.Cell(currentRow + 1, colIdx).Value = "X";
+                }
+                ws.Cell(currentRow, colIdx).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+                ws.Cell(currentRow + 1, colIdx).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+            }
+
+            // 6. Итого за 16-31 (Колонка 35): верхняя строка — дней, нижняя — часов
+            ws.Cell(currentRow, 35).Value = half2Days > 0 ? half2Days.ToString() : "0";
+            ws.Cell(currentRow + 1, 35).Value = half2Hours > 0 ? half2Hours.ToString("0.#") : "0";
+            ws.Cell(currentRow, 35).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+            ws.Cell(currentRow + 1, 35).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+            ws.Cell(currentRow, 35).Style.Font.Bold = true;
+            ws.Cell(currentRow + 1, 35).Style.Font.Bold = true;
+
+            // 7. Итоги за весь месяц (Колонки 36..40)
+            double totalMonthDays = matchingSummaries.Count > 0
+                ? matchingSummaries.Sum(s => s.DaysWorked)
+                : (half1Days + half2Days);
+            double totalMonthHours = matchingSummaries.Count > 0
+                ? matchingSummaries.Sum(s => s.TotalHours)
+                : (half1Hours + half2Hours);
+            double totalNightHours = matchingSummaries.Count > 0
+                ? matchingSummaries.Sum(s => s.NightHours)
+                : group.Sum(c => c.NightHours);
+            double totalHolidayHours = matchingSummaries.Count > 0
+                ? matchingSummaries.Sum(s => s.HolidayHours)
+                : 0;
+            int daysOffCount = daysInMonth - (int)totalMonthDays;
+            if (daysOffCount < 0) daysOffCount = 0;
+
+            // Колонка 36: Всего дней
+            ws.Cell(currentRow, 36).Value = totalMonthDays;
+            ws.Range(currentRow, 36, currentRow + 1, 36).Merge();
+            ws.Cell(currentRow, 36).Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
+            ws.Cell(currentRow, 36).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+            ws.Cell(currentRow, 36).Style.Font.Bold = true;
+
+            // Колонка 37: Всего часов
+            ws.Cell(currentRow, 37).Value = totalMonthHours;
+            ws.Range(currentRow, 37, currentRow + 1, 37).Merge();
+            ws.Cell(currentRow, 37).Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
+            ws.Cell(currentRow, 37).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+            ws.Cell(currentRow, 37).Style.Font.Bold = true;
+
+            // Колонка 38: В т.ч. ночных
+            ws.Cell(currentRow, 38).Value = totalNightHours;
+            ws.Range(currentRow, 38, currentRow + 1, 38).Merge();
+            ws.Cell(currentRow, 38).Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
+            ws.Cell(currentRow, 38).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+
+            // Колонка 39: В т.ч. праздничных
+            ws.Cell(currentRow, 39).Value = totalHolidayHours;
+            ws.Range(currentRow, 39, currentRow + 1, 39).Merge();
+            ws.Cell(currentRow, 39).Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
+            ws.Cell(currentRow, 39).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+
+            // Колонка 40: Выходных дней
+            ws.Cell(currentRow, 40).Value = daysOffCount;
+            ws.Range(currentRow, 40, currentRow + 1, 40).Merge();
+            ws.Cell(currentRow, 40).Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
+            ws.Cell(currentRow, 40).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+
+            var empBlock = ws.Range(currentRow, 1, currentRow + 1, totalCols);
+            empBlock.Style.Border.InsideBorder = XLBorderStyleValues.Thin;
+            empBlock.Style.Border.OutsideBorder = XLBorderStyleValues.Medium;
+
+            currentRow += 2;
+        }
+
+        currentRow += 1;
+        ws.Cell(currentRow, 2).Value = "Руководитель структурного подразделения: ________________ / ________________";
+        ws.Cell(currentRow + 1, 2).Value = "Работник кадровой службы / Табельщик: ________________ / ________________";
+        ws.Cell(currentRow, 2).Style.Font.FontSize = 9;
+        ws.Cell(currentRow + 1, 2).Style.Font.FontSize = 9;
+
+        // Оптимальная ширина колонок бланка Т-12 под печать
+        ws.Column(1).Width = 4.5;  // № п/п
+        ws.Column(2).Width = 24;   // ФИО (должность)
+        for (int c = 3; c <= 17; c++)
+        {
+            ws.Column(c).Width = 3.5; // Дни 1..15
+        }
+        ws.Column(18).Width = 7.5; // Итого 1-15
+        for (int c = 19; c <= 34; c++)
+        {
+            ws.Column(c).Width = 3.5; // Дни 16..31
+        }
+        ws.Column(35).Width = 7.5; // Итого 16-31
+        ws.Column(36).Width = 7.0; // Всего дней
+        ws.Column(37).Width = 8.0; // Всего часов
+        ws.Column(38).Width = 7.5; // В т.ч. ночных
+        ws.Column(39).Width = 7.5; // В т.ч. праздничных
+        ws.Column(40).Width = 7.0; // Выходных дней
+    }
+
+    /// <summary>
     /// Создание сводного бланка Т-13 по всем сменам сразу (безопасное объединение без дублирования)
     /// </summary>
     private void CreateConsolidatedT13Sheet(
@@ -370,7 +717,7 @@ public class ExcelExportService
     /// <summary>
     /// Создание листа с унифицированной формой Т-13 (печать табеля учета рабочего времени).
     /// Полный учет 31-го числа в отдельной выделенной колонке.
-    /// Форматирование под 1 лист А4 в альбомной ориентации.
+    /// Форматирование под лист А4 в альбомной ориентации.
     /// Пробел между ФИО и должностью в скобках.
     /// </summary>
     private void CreateT13Sheet(XLWorkbook workbook, ShiftSchedule schedule, List<RosterCell> cells, List<EmployeeMonthSummary> summaries, string sheetName)
@@ -381,10 +728,12 @@ public class ExcelExportService
 
         string orgName = DatabaseService.Instance.GetOrganizationName();
 
-        ws.Cell("A1").Value = "Унифицированная форма № Т-13";
+        ws.Cell("A1").Value = "Унифицированная форма № Т-13\nУтверждена Постановлением Госкомстата России от 05.01.2004 № 1\nКод по ОКУД 0301008";
         ws.Cell("A1").Style.Font.FontSize = 8;
         ws.Cell("A1").Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Right;
+        ws.Cell("A1").Style.Alignment.WrapText = true;
         ws.Range("A1:V1").Merge();
+        ws.Row(1).Height = 30;
 
         ws.Cell("A2").Value = $"Организация: {(!string.IsNullOrWhiteSpace(orgName) ? orgName : "________________")}";
         ws.Cell("A2").Style.Font.Bold = true;
@@ -447,8 +796,6 @@ public class ExcelExportService
 
         int currentRow = startRow + 2;
 
-        // Фиксируем строгий порядок сотрудников согласно ведомости сводки (без алфавитной сортировки!):
-        // сначала постоянные работники в порядке внесения в смену, затем подменные по порядку назначения
         var summaryOrderMap = new Dictionary<string, int>();
         int sIdx = 0;
         foreach (var s in summaries)
@@ -480,7 +827,6 @@ public class ExcelExportService
             var firstCell = group.First();
             string position = !string.IsNullOrWhiteSpace(firstCell.Position) ? firstCell.Position : "Оператор";
 
-            // Безопасное формирование словаря ячеек по дням (исключает System.ArgumentException при дублях)
             var dayCellsGroup = group.GroupBy(c => c.DayOfMonth)
                                      .ToDictionary(g => g.Key, g => g.ToList());
 
@@ -509,7 +855,7 @@ public class ExcelExportService
                 {
                     var primaryCell = dayList.OrderByDescending(c => c.TotalHours).First();
                     double totalH = dayList.Sum(c => c.TotalHours);
-                    ws.Cell(currentRow, colIdx).Value = GetT13Code(primaryCell);
+                    ws.Cell(currentRow, colIdx).Value = GetT12Code(primaryCell);
                     ws.Cell(currentRow + 1, colIdx).Value = totalH > 0 ? totalH.ToString("0.#") : "";
                     if (totalH > 0)
                     {
@@ -543,7 +889,7 @@ public class ExcelExportService
                 {
                     var primaryCell = dayList.OrderByDescending(c => c.TotalHours).First();
                     double totalH = dayList.Sum(c => c.TotalHours);
-                    ws.Cell(currentRow + 2, colIdx).Value = GetT13Code(primaryCell);
+                    ws.Cell(currentRow + 2, colIdx).Value = GetT12Code(primaryCell);
                     ws.Cell(currentRow + 3, colIdx).Value = totalH > 0 ? totalH.ToString("0.#") : "";
                     if (totalH > 0)
                     {
@@ -565,7 +911,7 @@ public class ExcelExportService
             {
                 var primaryCell31 = day31List.OrderByDescending(c => c.TotalHours).First();
                 double totalH31 = day31List.Sum(c => c.TotalHours);
-                ws.Cell(currentRow + 2, 18).Value = GetT13Code(primaryCell31);
+                ws.Cell(currentRow + 2, 18).Value = GetT12Code(primaryCell31);
                 ws.Cell(currentRow + 3, 18).Value = totalH31 > 0 ? totalH31.ToString("0.#") : "";
                 if (totalH31 > 0)
                 {
@@ -623,7 +969,7 @@ public class ExcelExportService
         }
 
         currentRow += 1;
-        ws.Cell(currentRow, 2).Value = "Руководитель подразделения: ________________ / ________________";
+        ws.Cell(currentRow, 2).Value = "Руководитель структурного подразделения: ________________ / ________________";
         ws.Cell(currentRow + 1, 2).Value = "Работник кадровой службы / Табельщик: ________________ / ________________";
         ws.Cell(currentRow, 2).Style.Font.FontSize = 9;
         ws.Cell(currentRow + 1, 2).Style.Font.FontSize = 9;
@@ -730,12 +1076,65 @@ public class ExcelExportService
         }
     }
 
-    private static string GetT13Code(RosterCell cell)
+    private static string GetT12Code(RosterCell cell)
     {
         if (cell.ShiftCode == "О") return "ОТ";
         if (cell.ShiftCode == "Б") return "Б";
         if (cell.ShiftCode == "В") return "В";
         if (cell.TotalHours > 0) return "Я";
         return cell.ShiftCode;
+    }
+
+    private static string GetT13Code(RosterCell cell) => GetT12Code(cell);
+
+    /// <summary>
+    /// Получение списка всех сгенерированных отчетов Excel в папке экспорта (от новых к старым).
+    /// </summary>
+    public static List<FileInfo> GetExportFiles(string? directory = null)
+    {
+        string dir = !string.IsNullOrWhiteSpace(directory)
+            ? directory
+            : DatabaseService.Instance.ExportsDirectory;
+
+        if (!Directory.Exists(dir))
+            return new List<FileInfo>();
+
+        return Directory.GetFiles(dir, "*.xlsx")
+            .Select(f => new FileInfo(f))
+            .OrderByDescending(f => f.LastWriteTime)
+            .ToList();
+    }
+
+    /// <summary>
+    /// Ограничение количества файлов отчетов в папке экспорта (максимум maxFiles, по умолчанию 25).
+    /// Старые файлы автоматически удаляются.
+    /// </summary>
+    public static void RotateExportFiles(string? directory = null, int maxFiles = 25)
+    {
+        try
+        {
+            var files = GetExportFiles(directory);
+            if (files.Count > maxFiles)
+            {
+                foreach (var file in files.Skip(maxFiles))
+                {
+                    try
+                    {
+                        if (file.Exists && !IsFileLocked(file.FullName))
+                        {
+                            file.Delete();
+                        }
+                    }
+                    catch
+                    {
+                        // Игнорируем заблокированные или занятые файлы
+                    }
+                }
+            }
+        }
+        catch
+        {
+            // Не прерываем выполнение при ошибках доступа к файловой системе
+        }
     }
 }

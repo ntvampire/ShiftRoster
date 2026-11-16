@@ -142,14 +142,14 @@
                     <StackPanel Spacing="6">
                         <TextBlock Text="ОТЧЕТЫ И ЭКСПОРТ В 1С" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource AppTextTertiaryBrush}" />
 
-                        <Button x:Name="ExportExcelSidebarButton" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Height="34" ToolTip.Tip="Экспорт текущей смены (Т-13 + ведомость для 1С)">
+                        <Button x:Name="ExportExcelSidebarButton" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Height="34" ToolTip.Tip="Экспорт текущей смены (Т-12, Т-13 + ведомость для 1С)">
                             <StackPanel Orientation="Horizontal" Spacing="8">
                                 <TextBlock Text="📊" FontSize="14" />
                                 <TextBlock Text="В Excel (эта смена)" VerticalAlignment="Center" FontSize="12" />
                             </StackPanel>
                         </Button>
 
-                        <Button x:Name="ExportConsolidatedSidebarButton" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Height="34" ToolTip.Tip="Сформировать единый сводный отчет сразу по ВСЕМ сменам">
+                        <Button x:Name="ExportConsolidatedSidebarButton" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Height="34" ToolTip.Tip="Сформировать единый сводный отчет сразу по ВСЕМ сменам (Т-12, Т-13 + ведомости)">
                             <StackPanel Orientation="Horizontal" Spacing="8">
                                 <TextBlock Text="📑" FontSize="14" />
                                 <TextBlock Text="Сводный отчет (все)" VerticalAlignment="Center" FontSize="12" />

@@ -1,0 +1,7 @@
+{
+  "version": "1.0.4",
+  "name": "ShiftRoster v1.0.4",
+  "body": "Поддержка унифицированных форм Т-12 и Т-13 в отчетах Excel, автоматическая ротация файлов отчетов (до 25 копий) и автопоиск обновлений из GitHub Releases.",
+  "windowsInstallerUrl": "https://github.com/ntvampire/ShiftRoster/releases/latest/download/ShiftRoster-Setup.exe",
+  "linuxArchiveUrl": "https://github.com/ntvampire/ShiftRoster/releases/latest/download/ShiftRoster-linux-x64.tar.gz"
+}

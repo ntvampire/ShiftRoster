@@ -11,6 +11,10 @@ sealed class Program
     [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
     private static extern int MessageBox(IntPtr hWnd, string text, string caption, uint type);
 
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool AttachConsole(int dwProcessId);
+    private const int ATTACH_PARENT_PROCESS = -1;
+
     [STAThread]
     public static void Main(string[] args)
     {
@@ -23,6 +27,23 @@ sealed class Program
         {
             if (args.Contains("--test"))
             {
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                {
+                    AttachConsole(ATTACH_PARENT_PROCESS);
+                }
+
+                try
+                {
+                    var stdOut = new StreamWriter(Console.OpenStandardOutput(), Console.OutputEncoding) { AutoFlush = true };
+                    Console.SetOut(stdOut);
+                    var stdErr = new StreamWriter(Console.OpenStandardError(), Console.OutputEncoding) { AutoFlush = true };
+                    Console.SetError(stdErr);
+                }
+                catch
+                {
+                    // Игнорируем, если стандартные потоки уже перенаправлены пайпом
+                }
+
                 VerificationTests.RunAllTests();
                 Environment.Exit(0);
                 return;
