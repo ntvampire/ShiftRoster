@@ -272,11 +272,23 @@ public class ExcelExportService
         int daysInMonth = DateTime.DaysInMonth(year, month);
         int totalCols = daysInMonth + 3;
 
+        // Список конкретных подразделений в отчете
+        var postNames = postDataList
+            .Select(p => p.Schedule.PostName)
+            .Where(p => !string.IsNullOrWhiteSpace(p))
+            .Distinct()
+            .ToList();
+        string postNamesStr = postNames.Count > 0 ? string.Join(", ", postNames) : "подразделений";
+
         // Заголовок сводного графика (строка 1)
         string monthName = ShiftSchedule.GetMonthName(month).ToLower();
+        string scheduleTitle = postNames.Count == 1
+            ? $"График работы подразделения: {postNamesStr} на {monthName} {year} года"
+            : $"График работы подразделений: {postNamesStr} на {monthName} {year} года";
+
         string titleText = !string.IsNullOrWhiteSpace(orgName)
-            ? $"{orgName}\nСводный график работы всех смен на {monthName} {year} года"
-            : $"Сводный график работы всех смен на {monthName} {year} года";
+            ? $"{orgName}\n{scheduleTitle}"
+            : scheduleTitle;
 
         ws.Cell(1, 1).Value = titleText;
         ws.Range(1, 1, 1, totalCols).Merge();
@@ -453,11 +465,18 @@ public class ExcelExportService
     {
         var allCells = postDataList.SelectMany(p => p.Cells).ToList();
         var allSummaries = postDataList.SelectMany(p => p.Summaries).ToList();
+        var postNames = postDataList
+            .Select(p => p.Schedule.PostName)
+            .Where(p => !string.IsNullOrWhiteSpace(p))
+            .Distinct()
+            .ToList();
+        string postNamesStr = postNames.Count > 0 ? string.Join(", ", postNames) : "подразделения предприятия";
+
         var virtualSchedule = new ShiftSchedule
         {
             Year = year,
             Month = month,
-            PostName = "Все подразделения предприятия"
+            PostName = postNamesStr
         };
 
         CreateT12Sheet(workbook, virtualSchedule, allCells, allSummaries, sheetName);
@@ -789,11 +808,18 @@ public class ExcelExportService
     {
         var allCells = postDataList.SelectMany(p => p.Cells).ToList();
         var allSummaries = postDataList.SelectMany(p => p.Summaries).ToList();
+        var postNames = postDataList
+            .Select(p => p.Schedule.PostName)
+            .Where(p => !string.IsNullOrWhiteSpace(p))
+            .Distinct()
+            .ToList();
+        string postNamesStr = postNames.Count > 0 ? string.Join(", ", postNames) : "подразделения предприятия";
+
         var virtualSchedule = new ShiftSchedule
         {
             Year = year,
             Month = month,
-            PostName = "Все подразделения предприятия"
+            PostName = postNamesStr
         };
 
         CreateT13Sheet(workbook, virtualSchedule, allCells, allSummaries, sheetName);

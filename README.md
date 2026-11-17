@@ -3,7 +3,7 @@
 [![Build and Release](https://github.com/ntvampire/ShiftRoster/actions/workflows/build-and-release.yml/badge.svg)](https://github.com/ntvampire/ShiftRoster/actions/workflows/build-and-release.yml)
 [![Latest Release](https://img.shields.io/github/v/release/ntvampire/ShiftRoster?color=2ea44f&label=Релиз)](https://github.com/ntvampire/ShiftRoster/releases/latest)
 [![Platform](https://img.shields.io/badge/Платформа-Windows%20(x86%20%7C%20x64)%20%7C%20Linux-blue)](#)
-[![Status](https://img.shields.io/badge/Статус-Стабильный%20релиз%20(v1.0.7)-success)](#)
+[![Status](https://img.shields.io/badge/Статус-Стабильный%20релиз%20(v1.0.8)-success)](#)
 
 Кроссплатформенное приложение для автоматизации составления графиков смен, табельного учета круглосуточных постов, оперативного управления подменными работниками и выгрузки данных в Excel/1С.
 

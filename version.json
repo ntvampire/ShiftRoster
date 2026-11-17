@@ -1,7 +1,7 @@
 {
-  "version": "1.0.7",
-  "name": "ShiftRoster v1.0.7",
-  "body": "Оптимизация листа «График работы» в Excel: одинаковая минимальная ширина (2.5) для всех столбцов дней месяца.",
+  "version": "1.0.8",
+  "name": "ShiftRoster v1.0.8",
+  "body": "Динамическое указание конкретных подразделений в шапках всех листов сводного отчета Excel (вместо фраз «все подразделения» / «все смены»).",
   "windowsInstallerUrl": "https://github.com/ntvampire/ShiftRoster/releases/latest/download/ShiftRoster-Setup.exe",
   "linuxArchiveUrl": "https://github.com/ntvampire/ShiftRoster/releases/latest/download/ShiftRoster-linux-x64.tar.gz"
 }
