@@ -55,6 +55,11 @@ sealed class Program
         {
             if (args.Contains("--test"))
             {
+                try
+                {
+                    File.WriteAllText("test_failure.log", $"[ТЕСТ ПРОВАЛЕН]: {ex.Message}\n{ex.StackTrace}");
+                }
+                catch { }
                 Console.Error.WriteLine($"\n[ТЕСТ ПРОВАЛЕН]: {ex.Message}\n{ex.StackTrace}");
                 Environment.Exit(1);
             }

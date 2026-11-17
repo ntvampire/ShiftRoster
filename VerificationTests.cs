@@ -159,25 +159,39 @@ public static class VerificationTests
         // Детальная проверка требований к отчетам (ClosedXML)
         using (var wb = new ClosedXML.Excel.XLWorkbook(consolidatedExcel))
         {
-            var wsSummary = wb.Worksheet(1);
-            if (wsSummary.PageSetup.PageOrientation != ClosedXML.Excel.XLPageOrientation.Landscape ||
-                wsSummary.PageSetup.PaperSize != ClosedXML.Excel.XLPaperSize.A4Paper)
+            if (wb.Worksheets.Count != 3)
             {
-                throw new Exception("Лист сводки не настроен на А4 альбомную ориентацию!");
+                throw new Exception($"В сводном отчете должно быть строго 3 листа, фактически: {wb.Worksheets.Count}!");
             }
 
-            // Проверка отсутствия столбца «Статус»
-            for (int col = 1; col <= 10; col++)
+            // 1. Лист «График работы»
+            var wsSchedule = wb.Worksheet("График работы");
+            if (wsSchedule.PageSetup.PageOrientation != ClosedXML.Excel.XLPageOrientation.Landscape ||
+                wsSchedule.PageSetup.PaperSize != ClosedXML.Excel.XLPaperSize.A4Paper)
             {
-                string headerVal = wsSummary.Cell(6, col).GetString();
-                if (headerVal.Contains("Статус"))
-                {
-                    throw new Exception("Столбец «Статус» обнаружен в сводной ведомости!");
-                }
+                throw new Exception("Лист 'График работы' не настроен на А4 альбомную ориентацию!");
             }
 
-            // Проверка бланка Т-12: Раздел 1, ОКУД 0301007, пробел перед скобкой должности, дни 1..15, 16..31, итоги
-            var wsT12 = wb.Worksheet("Сводный бланк Т-12");
+            string scheduleTitle = wsSchedule.Cell("A1").GetString();
+            if (scheduleTitle.IndexOf("график работы", StringComparison.OrdinalIgnoreCase) < 0)
+            {
+                throw new Exception($"Некорректный заголовок листа 'График работы': '{scheduleTitle}'");
+            }
+
+            if (wsSchedule.Cell(2, 1).GetString() != "№" || wsSchedule.Cell(2, 2).GetString() != "Ф.И.О.")
+            {
+                throw new Exception("Шапка таблицы графика работы не содержит колонок '№' и 'Ф.И.О.'!");
+            }
+
+            // Проверка наличия дней недели в строке 3
+            string dowDay1 = wsSchedule.Cell(3, 3).GetString();
+            if (string.IsNullOrWhiteSpace(dowDay1))
+            {
+                throw new Exception("В шапке графика работы не указан день недели для 1-го числа!");
+            }
+
+            // 2. Проверка бланка Т-12: Раздел 1, ОКУД 0301007, пробел перед скобкой должности, дни 1..15, 16..31, итоги
+            var wsT12 = wb.Worksheet("Бланк Т-12");
             if (wsT12.PageSetup.PageOrientation != ClosedXML.Excel.XLPageOrientation.Landscape)
             {
                 throw new Exception("Бланк Т-12 не настроен на альбомную ориентацию!");
@@ -233,8 +247,8 @@ public static class VerificationTests
                 throw new Exception("В бланке Т-12 строка кодов (строка 8) пуста для первого дня!");
             }
 
-            // Проверка одновременного наличия бланка Т-13 в том же файле
-            var wsT13 = wb.Worksheet("Сводный бланк Т-13");
+            // 3. Проверка одновременного наличия бланка Т-13 в том же файле
+            var wsT13 = wb.Worksheet("Бланк Т-13");
             if (wsT13.PageSetup.PageOrientation != ClosedXML.Excel.XLPageOrientation.Landscape)
             {
                 throw new Exception("Бланк Т-13 не настроен на альбомную ориентацию!");
@@ -667,13 +681,18 @@ public static class VerificationTests
         ExcelExportService.Instance.ExportRosterToExcel(testOrderXlsx, orderSched, loadedCells, orderSummaries);
         using (var wb = new ClosedXML.Excel.XLWorkbook(testOrderXlsx))
         {
-            var ws1C = wb.Worksheet("Сводка для 1С");
+            if (wb.Worksheets.Count != 3)
+            {
+                throw new Exception($"В обычном отчете должно быть строго 3 листа, фактически: {wb.Worksheets.Count}!");
+            }
+
+            var wsSchedule = wb.Worksheet("График работы");
             for (int i = 0; i < expectedOrder.Length; i++)
             {
-                string nameInCell = ws1C.Cell(6 + i, 2).GetString();
+                string nameInCell = wsSchedule.Cell(4 + i, 2).GetString();
                 if (nameInCell != expectedOrder[i])
                 {
-                    throw new Exception($"В листе 'Сводка для 1С' строка #{i + 1} содержит «{nameInCell}» вместо «{expectedOrder[i]}»!");
+                    throw new Exception($"В листе 'График работы' строка #{i + 1} содержит «{nameInCell}» вместо «{expectedOrder[i]}»!");
                 }
             }
 

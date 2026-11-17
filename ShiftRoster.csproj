@@ -9,7 +9,11 @@
     <RootNamespace>ShiftRoster</RootNamespace>
     <ApplicationIcon>Assets\app.ico</ApplicationIcon>
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
-    <Version>1.0.5</Version>
+    <PublishReadyToRun>true</PublishReadyToRun>
+    <TieredCompilation>true</TieredCompilation>
+    <TieredCompilationQuickJit>true</TieredCompilationQuickJit>
+    <TieredCompilationQuickJitForLoops>true</TieredCompilationQuickJitForLoops>
+    <Version>1.0.6</Version>
   </PropertyGroup>
 
   <ItemGroup>
