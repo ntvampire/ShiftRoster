@@ -1,7 +1,7 @@
 {
-  "version": "1.0.8",
-  "name": "ShiftRoster v1.0.8",
-  "body": "Динамическое указание конкретных подразделений в шапках всех листов сводного отчета Excel (вместо фраз «все подразделения» / «все смены»).",
+  "version": "1.0.9",
+  "name": "ShiftRoster v1.0.9",
+  "body": "Индикатор и детализация прогресса скачивания обновления (ProgressBar, проценты, объем в МБ) в окне обновления.",
   "windowsInstallerUrl": "https://github.com/ntvampire/ShiftRoster/releases/latest/download/ShiftRoster-Setup.exe",
   "linuxArchiveUrl": "https://github.com/ntvampire/ShiftRoster/releases/latest/download/ShiftRoster-linux-x64.tar.gz"
 }

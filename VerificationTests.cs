@@ -1086,7 +1086,20 @@ public static class VerificationTests
         {
             throw new Exception("EvaluateVersion ошибся: v99.9.9 не определена как более новая версия!");
         }
-        Console.WriteLine($"[УСПЕХ] (Текущая версия: {UpdateService.CurrentVersionString}, парсинг и валидация версий работают штатно)");
+
+        // Проверка структуры прогресса загрузки обновления
+        var prog1 = new UpdateDownloadProgress(50, 25 * 1024 * 1024, 50 * 1024 * 1024);
+        if (prog1.Percent != 50 || Math.Abs(prog1.BytesReadMegabytes - 25.0) > 0.01 || Math.Abs(prog1.TotalMegabytes.GetValueOrDefault() - 50.0) > 0.01)
+        {
+            throw new Exception("Ошибка вычисления параметров UpdateDownloadProgress для определенного размера!");
+        }
+
+        var prog2 = new UpdateDownloadProgress(-1, 10 * 1024 * 1024, null);
+        if (prog2.TotalMegabytes != null || Math.Abs(prog2.BytesReadMegabytes - 10.0) > 0.01)
+        {
+            throw new Exception("Ошибка вычисления параметров UpdateDownloadProgress для неопределенного размера!");
+        }
+        Console.WriteLine($"[УСПЕХ] (Текущая версия: {UpdateService.CurrentVersionString}, парсинг версий и модель прогресса работают штатно)");
 
         Console.WriteLine("=================================================");
         Console.WriteLine("ВСЕ ТЕСТЫ И ТРЕБОВАНИЯ ТЗ УСПЕШНО ВЫПОЛНЕНЫ!");

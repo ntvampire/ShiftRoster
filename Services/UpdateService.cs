@@ -206,8 +206,22 @@ public class UpdateService
 
     /// <summary>
     /// Загружает инсталлятор обновления в %TEMP% и запускает его, завершая текущий процесс.
+    /// Перегрузка для совместимости с отчетом прогресса в процентах (0-100).
     /// </summary>
-    public async Task DownloadAndLaunchInstallerAsync(string downloadUrl, IProgress<int>? progress = null, CancellationToken cancellationToken = default)
+    public Task DownloadAndLaunchInstallerAsync(string downloadUrl, IProgress<int>? progress = null, CancellationToken cancellationToken = default)
+    {
+        IProgress<UpdateDownloadProgress>? adapter = progress == null ? null : new Progress<UpdateDownloadProgress>(p =>
+        {
+            if (p.Percent >= 0) progress.Report(p.Percent);
+        });
+        return DownloadAndLaunchInstallerAsync(downloadUrl, adapter, cancellationToken);
+    }
+
+    /// <summary>
+    /// Загружает инсталлятор обновления в %TEMP% и запускает его, завершая текущий процесс.
+    /// Предоставляет расширенный прогресс загрузки (процент, прочитанные байты, общий размер).
+    /// </summary>
+    public async Task DownloadAndLaunchInstallerAsync(string downloadUrl, IProgress<UpdateDownloadProgress>? progress = null, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(downloadUrl))
             throw new ArgumentException("Не указан URL загрузки установщика.", nameof(downloadUrl));
@@ -222,51 +236,85 @@ public class UpdateService
         if (string.IsNullOrWhiteSpace(fileName)) fileName = "ShiftRoster-Setup.exe";
         string targetPath = Path.Combine(tempFolder, fileName);
 
-        using (var response = await _httpClient.GetAsync(downloadUrl, HttpCompletionOption.ResponseHeadersRead, cancellationToken))
+        try
         {
-            response.EnsureSuccessStatusCode();
-            long? totalBytes = response.Content.Headers.ContentLength;
-
-            using var contentStream = await response.Content.ReadAsStreamAsync(cancellationToken);
-            using var fileStream = new FileStream(targetPath, FileMode.Create, FileAccess.Write, FileShare.None);
-
-            var buffer = new byte[64 * 1024];
-            long totalRead = 0;
-            int bytesRead;
-
-            while ((bytesRead = await contentStream.ReadAsync(buffer, 0, buffer.Length, cancellationToken)) > 0)
+            using (var response = await _httpClient.GetAsync(downloadUrl, HttpCompletionOption.ResponseHeadersRead, cancellationToken))
             {
-                await fileStream.WriteAsync(buffer, 0, bytesRead, cancellationToken);
-                totalRead += bytesRead;
+                response.EnsureSuccessStatusCode();
+                long? totalBytes = response.Content.Headers.ContentLength;
 
-                if (totalBytes.HasValue && totalBytes.Value > 0)
+                using var contentStream = await response.Content.ReadAsStreamAsync(cancellationToken);
+                using var fileStream = new FileStream(targetPath, FileMode.Create, FileAccess.Write, FileShare.None);
+
+                var buffer = new byte[64 * 1024];
+                long totalRead = 0;
+                int bytesRead;
+                int lastPercent = -1;
+                long lastReportedBytes = 0;
+
+                // Начальный сигнал готовности
+                progress?.Report(new UpdateDownloadProgress(0, 0, totalBytes));
+
+                while ((bytesRead = await contentStream.ReadAsync(buffer, 0, buffer.Length, cancellationToken)) > 0)
                 {
-                    int percent = (int)((totalRead * 100) / totalBytes.Value);
-                    progress?.Report(percent);
+                    await fileStream.WriteAsync(buffer, 0, bytesRead, cancellationToken);
+                    totalRead += bytesRead;
+
+                    int percent = (totalBytes.HasValue && totalBytes.Value > 0)
+                        ? (int)((totalRead * 100) / totalBytes.Value)
+                        : -1;
+
+                    // Уведомляем UI при изменении процента или каждые 256 КБ
+                    if (percent != lastPercent || (totalRead - lastReportedBytes) >= 256 * 1024)
+                    {
+                        lastPercent = percent;
+                        lastReportedBytes = totalRead;
+                        progress?.Report(new UpdateDownloadProgress(percent, totalRead, totalBytes));
+                    }
                 }
+
+                progress?.Report(new UpdateDownloadProgress(100, totalRead, totalBytes ?? totalRead));
+            }
+
+            // Запуск установщика
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows) && targetPath.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+            {
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = targetPath,
+                    UseShellExecute = true
+                });
+
+                // Завершаем работу программы для беспрепятственного обновления файлов
+                Environment.Exit(0);
+            }
+            else
+            {
+                // Для других платформ открываем скачанный файл или папку
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = targetPath,
+                    UseShellExecute = true
+                });
             }
         }
-
-        // Запуск установщика
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows) && targetPath.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+        catch
         {
-            Process.Start(new ProcessStartInfo
+            // Очищаем частично загруженный файл при отмене или ошибке
+            if (File.Exists(targetPath))
             {
-                FileName = targetPath,
-                UseShellExecute = true
-            });
-
-            // Завершаем работу программы для беспрепятственного обновления файлов
-            Environment.Exit(0);
-        }
-        else
-        {
-            // Для других платформ открываем скачанный файл или папку
-            Process.Start(new ProcessStartInfo
-            {
-                FileName = targetPath,
-                UseShellExecute = true
-            });
+                try { File.Delete(targetPath); } catch { }
+            }
+            throw;
         }
     }
+}
+
+/// <summary>
+/// Информация о прогрессе загрузки установочного пакета обновления.
+/// </summary>
+public readonly record struct UpdateDownloadProgress(int Percent, long BytesRead, long? TotalBytes)
+{
+    public double BytesReadMegabytes => BytesRead / (1024.0 * 1024.0);
+    public double? TotalMegabytes => TotalBytes.HasValue && TotalBytes.Value > 0 ? TotalBytes.Value / (1024.0 * 1024.0) : null;
 }

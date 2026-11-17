@@ -310,10 +310,46 @@ public partial class MainWindow : Window
             vm.StatusMessage = $"Загрузка обновления {update.VersionTag}...";
             try
             {
+                var progressPanel = new StackPanel
+                {
+                    Spacing = 8,
+                    MinWidth = 340,
+                    Margin = new Thickness(0, 8, 0, 8)
+                };
+
+                var statusTextBlock = new TextBlock
+                {
+                    Text = $"Загрузка установочного пакета {update.VersionTag}...",
+                    FontSize = 13,
+                    TextWrapping = TextWrapping.Wrap
+                };
+
+                var progressBar = new ProgressBar
+                {
+                    Minimum = 0,
+                    Maximum = 100,
+                    Value = 0,
+                    Height = 6,
+                    IsIndeterminate = true,
+                    Margin = new Thickness(0, 4, 0, 2)
+                };
+
+                var detailsTextBlock = new TextBlock
+                {
+                    Text = "Подключение к серверу...",
+                    FontSize = 11.5,
+                    Opacity = 0.75,
+                    HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right
+                };
+
+                progressPanel.Children.Add(statusTextBlock);
+                progressPanel.Children.Add(progressBar);
+                progressPanel.Children.Add(detailsTextBlock);
+
                 var progressDialog = new ContentDialog
                 {
                     Title = "Загрузка обновления",
-                    Content = new TextBlock { Text = $"Загрузка установочного пакета {update.VersionTag}...", Margin = new Thickness(0, 10) },
+                    Content = progressPanel,
                     CloseButtonText = "Отмена"
                 };
 
@@ -324,19 +360,53 @@ public partial class MainWindow : Window
                 {
                     try
                     {
-                        var prog = new Progress<int>(pct =>
+                        var prog = new Progress<UpdateDownloadProgress>(info =>
                         {
                             Avalonia.Threading.Dispatcher.UIThread.Post(() =>
                             {
-                                vm.StatusMessage = $"Загрузка обновления: {pct}%";
+                                if (info.Percent >= 100)
+                                {
+                                    progressBar.IsIndeterminate = false;
+                                    progressBar.Value = 100;
+                                    statusTextBlock.Text = "Запуск программы установки...";
+                                    detailsTextBlock.Text = "100% (готово)";
+                                    vm.StatusMessage = "Запуск программы установки...";
+                                }
+                                else if (info.TotalBytes.HasValue && info.TotalBytes.Value > 0)
+                                {
+                                    progressBar.IsIndeterminate = false;
+                                    progressBar.Value = Math.Clamp(info.Percent, 0, 100);
+                                    double readMb = info.BytesRead / (1024.0 * 1024.0);
+                                    double totalMb = info.TotalBytes.Value / (1024.0 * 1024.0);
+                                    detailsTextBlock.Text = $"{info.Percent}% ({readMb:F1} МБ из {totalMb:F1} МБ)";
+                                    vm.StatusMessage = $"Загрузка обновления: {info.Percent}% ({readMb:F1} / {totalMb:F1} МБ)";
+                                }
+                                else
+                                {
+                                    progressBar.IsIndeterminate = true;
+                                    double readMb = info.BytesRead / (1024.0 * 1024.0);
+                                    detailsTextBlock.Text = $"{readMb:F1} МБ";
+                                    vm.StatusMessage = $"Загрузка обновления: {readMb:F1} МБ";
+                                }
                             });
                         });
                         await UpdateService.Instance.DownloadAndLaunchInstallerAsync(update.DownloadUrl, prog, cts.Token);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                        {
+                            vm.StatusMessage = "Загрузка обновления отменена.";
+                        });
                     }
                     catch (Exception ex) when (!cts.IsCancellationRequested)
                     {
                         Avalonia.Threading.Dispatcher.UIThread.Post(() =>
                         {
+                            statusTextBlock.Text = $"Ошибка загрузки: {ex.Message}";
+                            progressBar.IsIndeterminate = false;
+                            detailsTextBlock.Text = "Загрузка прервана";
+                            progressDialog.CloseButtonText = "Закрыть";
                             vm.StatusMessage = $"Ошибка загрузки обновления: {ex.Message}";
                         });
                     }
