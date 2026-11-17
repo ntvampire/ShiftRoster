@@ -240,12 +240,12 @@ public class ExcelExportService
         ws.Cell(currentRow, 2).Style.Font.Bold = true;
         ws.Cell(currentRow, 2).Style.Font.FontSize = 10;
 
-        // Ширины колонок
+        // Ширины колонок: столбцы дней одинаковой минимальной ширины 2.5
         ws.Column(1).Width = 5;
         ws.Column(2).Width = 24;
         for (int d = 1; d <= daysInMonth; d++)
         {
-            ws.Column(2 + d).Width = 4.5;
+            ws.Column(2 + d).Width = 2.5;
         }
         ws.Column(totalCols).Width = 11;
     }
@@ -431,12 +431,12 @@ public class ExcelExportService
         ws.Cell(currentRow, 2).Style.Font.Bold = true;
         ws.Cell(currentRow, 2).Style.Font.FontSize = 10;
 
-        // Ширины колонок
+        // Ширины колонок: столбцы дней одинаковой минимальной ширины 2.5
         ws.Column(1).Width = 5;
         ws.Column(2).Width = 24;
         for (int d = 1; d <= daysInMonth; d++)
         {
-            ws.Column(2 + d).Width = 4.5;
+            ws.Column(2 + d).Width = 2.5;
         }
         ws.Column(totalCols).Width = 11;
     }

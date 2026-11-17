@@ -1,7 +1,7 @@
 {
-  "version": "1.0.6",
-  "name": "ShiftRoster v1.0.6",
-  "body": "Ускорение холодного старта приложения через ReadyToRun (R2R); новый лист «График работы» в Excel-отчетах вместо сводок 1С (строго 3 листа: График, Т-12, Т-13).",
+  "version": "1.0.7",
+  "name": "ShiftRoster v1.0.7",
+  "body": "Оптимизация листа «График работы» в Excel: одинаковая минимальная ширина (2.5) для всех столбцов дней месяца.",
   "windowsInstallerUrl": "https://github.com/ntvampire/ShiftRoster/releases/latest/download/ShiftRoster-Setup.exe",
   "linuxArchiveUrl": "https://github.com/ntvampire/ShiftRoster/releases/latest/download/ShiftRoster-linux-x64.tar.gz"
 }
