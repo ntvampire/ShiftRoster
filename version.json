@@ -1,7 +1,7 @@
 {
-  "version": "1.0.9",
-  "name": "ShiftRoster v1.0.9",
-  "body": "Индикатор и детализация прогресса скачивания обновления (ProgressBar, проценты, объем в МБ) в окне обновления.",
+  "version": "1.0.10",
+  "name": "ShiftRoster v1.0.10",
+  "body": "Комплексное усиление безопасности и надежности: валидация доменов обновлений, атомарный бэкап базы данных VACUUM INTO, вторичные индексы SQLite, санитизация Formula Injection в Excel и исправление путей аварийных логов.",
   "windowsInstallerUrl": "https://github.com/ntvampire/ShiftRoster/releases/latest/download/ShiftRoster-Setup.exe",
   "linuxArchiveUrl": "https://github.com/ntvampire/ShiftRoster/releases/latest/download/ShiftRoster-linux-x64.tar.gz"
 }

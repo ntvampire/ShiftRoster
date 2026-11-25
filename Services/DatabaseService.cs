@@ -95,7 +95,8 @@ public class DatabaseService
 
     /// <summary>
     /// Автоматическое резервное копирование при старте:
-    /// Создает 1 копию и оставляет строго 3 самые свежие.
+    /// Создает 1 атомарную копию базы через VACUUM INTO (полная целостность при WAL-режиме)
+    /// и сохраняет строго 3 самые свежие копии.
     /// </summary>
     public void PerformStartupBackup()
     {
@@ -113,7 +114,40 @@ public class DatabaseService
             string backupFileName = $"ShiftRoster_{timestamp}.db";
             string backupFilePath = Path.Combine(_backupsDir, backupFileName);
 
-            File.Copy(_dbPath, backupFilePath, overwrite: true);
+            // Удаляем старый файл с таким же именем, если он существует (VACUUM INTO требует отсутствия целевого файла)
+            if (File.Exists(backupFilePath))
+            {
+                try { File.Delete(backupFilePath); } catch { }
+            }
+
+            bool vacuumSuccess = false;
+            try
+            {
+                using var conn = CreateOpenConnection();
+                using var cmd = conn.CreateCommand();
+                cmd.CommandText = "VACUUM INTO @dst";
+                cmd.Parameters.AddWithValue("@dst", backupFilePath);
+                cmd.ExecuteNonQuery();
+                vacuumSuccess = true;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"VACUUM INTO завершился ошибкой: {ex.Message}. Переход на сброс WAL и прямое копирование.");
+            }
+
+            if (!vacuumSuccess)
+            {
+                try
+                {
+                    using var conn = CreateOpenConnection();
+                    using var cmd = conn.CreateCommand();
+                    cmd.CommandText = "PRAGMA wal_checkpoint(TRUNCATE);";
+                    cmd.ExecuteNonQuery();
+                }
+                catch { }
+
+                File.Copy(_dbPath, backupFilePath, overwrite: true);
+            }
 
             // Ротация: оставляем только 3 самые свежие копии
             var backupFiles = Directory.GetFiles(_backupsDir, "ShiftRoster_*.db")
@@ -260,6 +294,12 @@ public class DatabaseService
                 Employee2Name TEXT NOT NULL,
                 Reason TEXT
             );
+
+            CREATE INDEX IF NOT EXISTS IX_RosterCells_ScheduleId ON RosterCells(ScheduleId);
+            CREATE INDEX IF NOT EXISTS IX_ShiftSchedules_Year_Month ON ShiftSchedules(Year, Month, PostName);
+            CREATE INDEX IF NOT EXISTS IX_AbsenceEvents_ScheduleId ON AbsenceEvents(ScheduleId);
+            CREATE INDEX IF NOT EXISTS IX_ShiftSubstitutions_ScheduleId ON ShiftSubstitutions(ScheduleId);
+            CREATE INDEX IF NOT EXISTS IX_ShiftSwaps_ScheduleId ON ShiftSwaps(ScheduleId);
         ";
         command.ExecuteNonQuery();
 
@@ -309,8 +349,7 @@ public class DatabaseService
     public List<Employee> GetEmployees(string? postName = null)
     {
         var result = new List<Employee>();
-        using var conn = new SqliteConnection(_connectionString);
-        conn.Open();
+        using var conn = CreateOpenConnection();
 
         using var cmd = conn.CreateCommand();
         if (string.IsNullOrWhiteSpace(postName))
@@ -345,8 +384,7 @@ public class DatabaseService
 
     public void SaveEmployee(Employee emp)
     {
-        using var conn = new SqliteConnection(_connectionString);
-        conn.Open();
+        using var conn = CreateOpenConnection();
         using var cmd = conn.CreateCommand();
 
         if (emp.Id == 0)
@@ -387,8 +425,7 @@ public class DatabaseService
 
     public void UpdateEmployeesOrder(List<Employee> employees)
     {
-        using var conn = new SqliteConnection(_connectionString);
-        conn.Open();
+        using var conn = CreateOpenConnection();
         using var tx = conn.BeginTransaction();
 
         for (int i = 0; i < employees.Count; i++)
@@ -408,8 +445,7 @@ public class DatabaseService
     public List<string> GetAllPostNames()
     {
         var posts = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        using var conn = new SqliteConnection(_connectionString);
-        conn.Open();
+        using var conn = CreateOpenConnection();
 
         using var cmd = conn.CreateCommand();
         cmd.CommandText = @"
@@ -438,8 +474,7 @@ public class DatabaseService
     /// </summary>
     public void ClearAllRosterData()
     {
-        using var conn = new SqliteConnection(_connectionString);
-        conn.Open();
+        using var conn = CreateOpenConnection();
         using var cmd = conn.CreateCommand();
         cmd.CommandText = @"
             DELETE FROM RosterCells;
@@ -451,8 +486,7 @@ public class DatabaseService
 
     public string GetOrganizationName()
     {
-        using var conn = new SqliteConnection(_connectionString);
-        conn.Open();
+        using var conn = CreateOpenConnection();
         using var cmd = conn.CreateCommand();
         cmd.CommandText = "SELECT Value FROM AppSettings WHERE Key = 'OrganizationName' LIMIT 1";
         var val = cmd.ExecuteScalar() as string;
@@ -461,8 +495,7 @@ public class DatabaseService
 
     public void SetOrganizationName(string name)
     {
-        using var conn = new SqliteConnection(_connectionString);
-        conn.Open();
+        using var conn = CreateOpenConnection();
         using var cmd = conn.CreateCommand();
         cmd.CommandText = @"
             INSERT INTO AppSettings (Key, Value) VALUES ('OrganizationName', @val)
@@ -473,8 +506,7 @@ public class DatabaseService
 
     public string GetThemeMode()
     {
-        using var conn = new SqliteConnection(_connectionString);
-        conn.Open();
+        using var conn = CreateOpenConnection();
         using var cmd = conn.CreateCommand();
         cmd.CommandText = "SELECT Value FROM AppSettings WHERE Key = 'ThemeMode' LIMIT 1";
         var val = cmd.ExecuteScalar() as string;
@@ -483,8 +515,7 @@ public class DatabaseService
 
     public void SetThemeMode(string mode)
     {
-        using var conn = new SqliteConnection(_connectionString);
-        conn.Open();
+        using var conn = CreateOpenConnection();
         using var cmd = conn.CreateCommand();
         cmd.CommandText = @"
             INSERT INTO AppSettings (Key, Value) VALUES ('ThemeMode', @val)
@@ -502,8 +533,7 @@ public class DatabaseService
             return (DateTime.Now.Year, DateTime.Now.Month);
 
         string key = $"PostBaseMonth_{postName.Trim().ToLowerInvariant()}";
-        using var conn = new SqliteConnection(_connectionString);
-        conn.Open();
+        using var conn = CreateOpenConnection();
         using var cmd = conn.CreateCommand();
         cmd.CommandText = "SELECT Value FROM AppSettings WHERE Key = @k LIMIT 1";
         cmd.Parameters.AddWithValue("@k", key);
@@ -539,8 +569,7 @@ public class DatabaseService
 
         string key = $"PostBaseMonth_{postName.Trim().ToLowerInvariant()}";
         string val = $"{year:D4}-{month:D2}";
-        using var conn = new SqliteConnection(_connectionString);
-        conn.Open();
+        using var conn = CreateOpenConnection();
         using var cmd = conn.CreateCommand();
         cmd.CommandText = @"
             INSERT INTO AppSettings (Key, Value) VALUES (@k, @v)
@@ -553,8 +582,7 @@ public class DatabaseService
     public List<ShiftSchedule> GetAllSchedulesForMonth(int year, int month)
     {
         var result = new List<ShiftSchedule>();
-        using var conn = new SqliteConnection(_connectionString);
-        conn.Open();
+        using var conn = CreateOpenConnection();
 
         using var cmd = conn.CreateCommand();
         cmd.CommandText = "SELECT Id, Year, Month, Name, PostName, PatternType, CreatedAt FROM ShiftSchedules WHERE Year = @y AND Month = @m ORDER BY PostName";
@@ -581,8 +609,7 @@ public class DatabaseService
 
     public void DeleteEmployee(int id)
     {
-        using var conn = new SqliteConnection(_connectionString);
-        conn.Open();
+        using var conn = CreateOpenConnection();
         using var tx = conn.BeginTransaction();
 
         string empName = string.Empty;
@@ -619,8 +646,7 @@ public class DatabaseService
     {
         if (string.IsNullOrWhiteSpace(postName)) return;
 
-        using var conn = new SqliteConnection(_connectionString);
-        conn.Open();
+        using var conn = CreateOpenConnection();
         using var tx = conn.BeginTransaction();
 
         using var cmd1 = conn.CreateCommand();
@@ -650,8 +676,7 @@ public class DatabaseService
     {
         if (string.IsNullOrWhiteSpace(postName)) return "1/3";
 
-        using var conn = new SqliteConnection(_connectionString);
-        conn.Open();
+        using var conn = CreateOpenConnection();
         using var cmd = conn.CreateCommand();
         cmd.CommandText = "SELECT PatternType FROM ShiftSchedules WHERE PostName = @p ORDER BY Id DESC LIMIT 1";
         cmd.Parameters.AddWithValue("@p", postName);
@@ -669,8 +694,7 @@ public class DatabaseService
     {
         if (string.IsNullOrWhiteSpace(postName)) return;
 
-        using var conn = new SqliteConnection(_connectionString);
-        conn.Open();
+        using var conn = CreateOpenConnection();
         using var cmd = conn.CreateCommand();
         cmd.CommandText = "UPDATE ShiftSchedules SET PatternType = @pat WHERE PostName = @p";
         cmd.Parameters.AddWithValue("@pat", pattern);
@@ -699,8 +723,7 @@ public class DatabaseService
             };
         }
 
-        using var conn = new SqliteConnection(_connectionString);
-        conn.Open();
+        using var conn = CreateOpenConnection();
 
         using var cmd = conn.CreateCommand();
         cmd.CommandText = "SELECT Id, Year, Month, Name, PostName, PatternType, CreatedAt FROM ShiftSchedules WHERE Year = @y AND Month = @m AND PostName = @p LIMIT 1";
@@ -754,8 +777,7 @@ public class DatabaseService
     public List<RosterCell> GetRosterCells(int scheduleId)
     {
         var result = new List<RosterCell>();
-        using var conn = new SqliteConnection(_connectionString);
-        conn.Open();
+        using var conn = CreateOpenConnection();
 
         using var cmd = conn.CreateCommand();
         cmd.CommandText = @"
@@ -1004,8 +1026,7 @@ public class DatabaseService
     public List<RussianCalendarDay> GetHolidays(int year)
     {
         var result = new List<RussianCalendarDay>();
-        using var conn = new SqliteConnection(_connectionString);
-        conn.Open();
+        using var conn = CreateOpenConnection();
 
         using var cmd = conn.CreateCommand();
         cmd.CommandText = "SELECT Year, Month, Day, IsHoliday, IsPreHoliday, IsWeekend, Description FROM Holidays WHERE Year = @y";
@@ -1030,8 +1051,7 @@ public class DatabaseService
 
     public void SaveHolidays(int year, IEnumerable<RussianCalendarDay> days)
     {
-        using var conn = new SqliteConnection(_connectionString);
-        conn.Open();
+        using var conn = CreateOpenConnection();
         using var trans = conn.BeginTransaction();
 
         using var del = conn.CreateCommand();

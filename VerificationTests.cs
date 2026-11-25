@@ -35,7 +35,37 @@ public static class VerificationTests
         {
             throw new Exception($"Ротация не сработала: найдено {backups.Count} бэкапов вместо максимум 3!");
         }
-        Console.WriteLine($"[УСПЕХ] (БД: {Path.GetFileName(dbPath)}, Бэкапов: {backups.Count})");
+        if (backups.Count == 0 || backups[0].Length == 0)
+        {
+            throw new Exception("Файл резервной копии не был создан или имеет нулевой размер!");
+        }
+
+        // Проверка атомарности и целостности резервной копии SQLite
+        using (var backupConn = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={backups[0].FullName}"))
+        {
+            backupConn.Open();
+            using var pragmaCheck = backupConn.CreateCommand();
+            pragmaCheck.CommandText = "PRAGMA integrity_check;";
+            var checkResult = pragmaCheck.ExecuteScalar()?.ToString();
+            if (checkResult != "ok")
+            {
+                throw new Exception($"Целостность бэкапа нарушена: {checkResult}");
+            }
+        }
+
+        // Проверка наличия вторичных индексов для ускорения поиска
+        using (var idxConn = db.CreateOpenConnection())
+        {
+            using var idxCmd = idxConn.CreateCommand();
+            idxCmd.CommandText = "SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name = 'IX_RosterCells_ScheduleId';";
+            var idxCount = Convert.ToInt32(idxCmd.ExecuteScalar());
+            if (idxCount == 0)
+            {
+                throw new Exception("Индекс IX_RosterCells_ScheduleId не найден в базе данных!");
+            }
+        }
+
+        Console.WriteLine($"[УСПЕХ] (БД: {Path.GetFileName(dbPath)}, Бэкапов: {backups.Count}, VACUUM целостность подтверждена)");
 
         // 2. Проверка сотрудников и стартовых дней смен
         Console.Write("2. Справочник сотрудников и стартовые дни смен... ");
@@ -1099,7 +1129,39 @@ public static class VerificationTests
         {
             throw new Exception("Ошибка вычисления параметров UpdateDownloadProgress для неопределенного размера!");
         }
-        Console.WriteLine($"[УСПЕХ] (Текущая версия: {UpdateService.CurrentVersionString}, парсинг версий и модель прогресса работают штатно)");
+
+        // Проверка безопасности: валидация доверенных доменов загрузки обновлений
+        if (!UpdateService.IsTrustedDownloadUrl("https://github.com/ntvampire/ShiftRoster/releases/download/v1.0.9/ShiftRoster-Setup.exe") ||
+            !UpdateService.IsTrustedDownloadUrl("https://objects.githubusercontent.com/test-asset") ||
+            !UpdateService.IsTrustedDownloadUrl("https://ntvampire.github.io/ShiftRoster/version.json"))
+        {
+            throw new Exception("Ошибка безопасности: доверенные адреса GitHub/Pages были ошибочно заблокированы!");
+        }
+
+        if (UpdateService.IsTrustedDownloadUrl("http://github.com/insecure.exe") ||
+            UpdateService.IsTrustedDownloadUrl("https://evil-hacker.com/malware.exe") ||
+            UpdateService.IsTrustedDownloadUrl("file:///C:/malware.exe") ||
+            UpdateService.IsTrustedDownloadUrl(""))
+        {
+            throw new Exception("Ошибка безопасности: недоверенный или небезопасный URL обновления не был заблокирован!");
+        }
+
+        // Проверка санитизации имени скачиваемого файла
+        string safeName = UpdateService.SanitizeFileName("../../evil_script.exe");
+        if (safeName.Contains("..") || safeName.Contains("/") || safeName.Contains("\\"))
+        {
+            throw new Exception($"Ошибка безопасности: имя файла не очищено от Path Traversal: {safeName}");
+        }
+
+        // Проверка санитизации Formula Injection для Excel
+        if (ExcelExportService.SanitizeForExcel("=1+2") != "'=1+2" ||
+            ExcelExportService.SanitizeForExcel("+cmd|' /C calc'!A0") != "'+cmd|' /C calc'!A0" ||
+            ExcelExportService.SanitizeForExcel("Иванов И.И.") != "Иванов И.И.")
+        {
+            throw new Exception("Ошибка безопасности: санитизация Formula Injection в Excel не сработала!");
+        }
+
+        Console.WriteLine($"[УСПЕХ] (Текущая версия: {UpdateService.CurrentVersionString}, валидация доменов, защита от Path/Formula Injection подтверждены)");
 
         Console.WriteLine("=================================================");
         Console.WriteLine("ВСЕ ТЕСТЫ И ТРЕБОВАНИЯ ТЗ УСПЕШНО ВЫПОЛНЕНЫ!");

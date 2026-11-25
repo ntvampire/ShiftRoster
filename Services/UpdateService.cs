@@ -1,9 +1,12 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Net.Http;
 using System.Reflection;
 using System.Runtime.InteropServices;
+using System.Security;
+using System.Security.Cryptography;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -20,6 +23,7 @@ public class UpdateInfo
     public string ReleaseName { get; set; } = string.Empty;
     public string ReleaseNotes { get; set; } = string.Empty;
     public string DownloadUrl { get; set; } = string.Empty;
+    public string? Sha256Checksum { get; set; }
     public bool IsNewerThanCurrent { get; set; }
 }
 
@@ -113,20 +117,27 @@ public class UpdateService
         string notes = root.TryGetProperty("body", out var bProp) ? bProp.GetString() ?? "" : "";
         
         string downloadUrl = "";
+        string sha256 = "";
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
         {
             downloadUrl = root.TryGetProperty("windowsInstallerUrl", out var wProp) 
                 ? wProp.GetString() ?? "" 
                 : (root.TryGetProperty("downloadUrl", out var dProp) ? dProp.GetString() ?? "" : "");
+            sha256 = root.TryGetProperty("windowsInstallerSha256", out var wsProp)
+                ? wsProp.GetString() ?? ""
+                : (root.TryGetProperty("sha256", out var sProp) ? sProp.GetString() ?? "" : "");
         }
         else
         {
             downloadUrl = root.TryGetProperty("linuxArchiveUrl", out var lProp) 
                 ? lProp.GetString() ?? "" 
                 : (root.TryGetProperty("downloadUrl", out var dProp) ? dProp.GetString() ?? "" : "");
+            sha256 = root.TryGetProperty("linuxArchiveSha256", out var lsProp)
+                ? lsProp.GetString() ?? ""
+                : (root.TryGetProperty("sha256", out var sProp) ? sProp.GetString() ?? "" : "");
         }
 
-        return EvaluateVersion(verStr, name, notes, downloadUrl);
+        return EvaluateVersion(verStr, name, notes, downloadUrl, sha256);
     }
 
     private async Task<UpdateInfo?> CheckGitHubApiAsync(CancellationToken cancellationToken)
@@ -172,7 +183,68 @@ public class UpdateService
         return EvaluateVersion(tag, name, body, downloadUrl);
     }
 
-    public static UpdateInfo? EvaluateVersion(string rawVersion, string releaseName, string releaseNotes, string downloadUrl)
+    /// <summary>
+    /// Проверка доверия к URL загрузки обновлений (строго HTTPS и белый список хостов GitHub).
+    /// </summary>
+    public static bool IsTrustedDownloadUrl(string? url)
+    {
+        if (string.IsNullOrWhiteSpace(url))
+            return false;
+
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
+            return false;
+
+        if (uri.Scheme != Uri.UriSchemeHttps)
+            return false;
+
+        string host = uri.Host.ToLowerInvariant();
+        return host == "github.com"
+            || host == "api.github.com"
+            || host == "raw.githubusercontent.com"
+            || host == "objects.githubusercontent.com"
+            || host == "github-releases.githubusercontent.com"
+            || host == "ntvampire.github.io"
+            || host.EndsWith(".github.io", StringComparison.OrdinalIgnoreCase)
+            || host.EndsWith(".githubusercontent.com", StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// Очистка и санитизация имени скачиваемого файла для предотвращения атак Path Traversal.
+    /// </summary>
+    public static string SanitizeFileName(string? rawName)
+    {
+        string defaultName = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "ShiftRoster-Setup.exe" : "ShiftRoster.tar.gz";
+        if (string.IsNullOrWhiteSpace(rawName))
+            return defaultName;
+
+        // Извлекаем строго имя файла, отсекая любые пути
+        string fileName = Path.GetFileName(rawName.Replace('\\', '/'));
+        if (string.IsNullOrWhiteSpace(fileName))
+            return defaultName;
+
+        char[] invalidChars = Path.GetInvalidFileNameChars();
+        var cleanChars = fileName.Where(c => !invalidChars.Contains(c) && c != '/' && c != '\\').ToArray();
+        string clean = new string(cleanChars).Trim();
+
+        // Устраняем последовательности точек (Path Traversal) и ведущие точки
+        while (clean.Contains(".."))
+        {
+            clean = clean.Replace("..", "");
+        }
+        clean = clean.TrimStart('.');
+
+        if (string.IsNullOrWhiteSpace(clean))
+            return defaultName;
+
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows) && !clean.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+        {
+            clean += ".exe";
+        }
+
+        return clean;
+    }
+
+    public static UpdateInfo? EvaluateVersion(string rawVersion, string releaseName, string releaseNotes, string downloadUrl, string? sha256 = null)
     {
         if (string.IsNullOrWhiteSpace(rawVersion))
             return null;
@@ -200,6 +272,7 @@ public class UpdateService
             ReleaseName = string.IsNullOrWhiteSpace(releaseName) ? $"ShiftRoster v{cleanVersion}" : releaseName,
             ReleaseNotes = releaseNotes,
             DownloadUrl = downloadUrl,
+            Sha256Checksum = string.IsNullOrWhiteSpace(sha256) ? null : sha256.Trim(),
             IsNewerThanCurrent = isNewer
         };
     }
@@ -210,21 +283,42 @@ public class UpdateService
     /// </summary>
     public Task DownloadAndLaunchInstallerAsync(string downloadUrl, IProgress<int>? progress = null, CancellationToken cancellationToken = default)
     {
+        return DownloadAndLaunchInstallerAsync(downloadUrl, progress, null, cancellationToken);
+    }
+
+    public Task DownloadAndLaunchInstallerAsync(string downloadUrl, IProgress<int>? progress, string? expectedSha256, CancellationToken cancellationToken = default)
+    {
         IProgress<UpdateDownloadProgress>? adapter = progress == null ? null : new Progress<UpdateDownloadProgress>(p =>
         {
             if (p.Percent >= 0) progress.Report(p.Percent);
         });
-        return DownloadAndLaunchInstallerAsync(downloadUrl, adapter, cancellationToken);
+        return DownloadAndLaunchInstallerAsync(downloadUrl, adapter, expectedSha256, cancellationToken);
     }
 
     /// <summary>
     /// Загружает инсталлятор обновления в %TEMP% и запускает его, завершая текущий процесс.
     /// Предоставляет расширенный прогресс загрузки (процент, прочитанные байты, общий размер).
     /// </summary>
-    public async Task DownloadAndLaunchInstallerAsync(string downloadUrl, IProgress<UpdateDownloadProgress>? progress = null, CancellationToken cancellationToken = default)
+    public Task DownloadAndLaunchInstallerAsync(string downloadUrl, IProgress<UpdateDownloadProgress>? progress = null, CancellationToken cancellationToken = default)
+    {
+        return DownloadAndLaunchInstallerAsync(downloadUrl, progress, null, cancellationToken);
+    }
+
+    /// <summary>
+    /// Загружает инсталлятор обновления в %TEMP% с валидацией источника (whitelist HTTPS),
+    /// проверкой контрольной суммы SHA-256 и безопасным запуском.
+    /// </summary>
+    public async Task DownloadAndLaunchInstallerAsync(
+        string downloadUrl, 
+        IProgress<UpdateDownloadProgress>? progress, 
+        string? expectedSha256, 
+        CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(downloadUrl))
             throw new ArgumentException("Не указан URL загрузки установщика.", nameof(downloadUrl));
+
+        if (!IsTrustedDownloadUrl(downloadUrl))
+            throw new SecurityException($"URL загрузки обновления «{downloadUrl}» не прошел проверку безопасности (разрешены только доверенные адреса GitHub по HTTPS).");
 
         string tempFolder = Path.Combine(Path.GetTempPath(), "ShiftRosterUpdate");
         if (!Directory.Exists(tempFolder))
@@ -232,8 +326,14 @@ public class UpdateService
             Directory.CreateDirectory(tempFolder);
         }
 
-        string fileName = Path.GetFileName(new Uri(downloadUrl).LocalPath);
-        if (string.IsNullOrWhiteSpace(fileName)) fileName = "ShiftRoster-Setup.exe";
+        string rawFileName = "";
+        try
+        {
+            rawFileName = Path.GetFileName(new Uri(downloadUrl).LocalPath);
+        }
+        catch { }
+
+        string fileName = SanitizeFileName(rawFileName);
         string targetPath = Path.Combine(tempFolder, fileName);
 
         try
@@ -276,6 +376,28 @@ public class UpdateService
                 progress?.Report(new UpdateDownloadProgress(100, totalRead, totalBytes ?? totalRead));
             }
 
+            // Валидация размера: установочный пакет не может быть пустой заглушкой
+            var fileInfo = new FileInfo(targetPath);
+            if (fileInfo.Length < 100 * 1024) // минимум 100 КБ
+            {
+                throw new InvalidDataException($"Размер скачанного установочного пакета ({fileInfo.Length} байт) меньше допустимого минимума. Возможно, файл поврежден при передаче.");
+            }
+
+            // Валидация контрольной суммы SHA-256 (если передана в манифесте обновления)
+            if (!string.IsNullOrWhiteSpace(expectedSha256))
+            {
+                using var sha256 = SHA256.Create();
+                using var verifyStream = File.OpenRead(targetPath);
+                byte[] hashBytes = await sha256.ComputeHashAsync(verifyStream, cancellationToken);
+                string computedHash = Convert.ToHexString(hashBytes).ToLowerInvariant();
+                string cleanExpected = expectedSha256.Trim().ToLowerInvariant();
+
+                if (!computedHash.Equals(cleanExpected, StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new SecurityException($"Контрольная сумма SHA-256 не совпадает!\nОжидалось: {cleanExpected}\nВычислено: {computedHash}");
+                }
+            }
+
             // Запуск установщика
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows) && targetPath.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
             {
@@ -290,10 +412,10 @@ public class UpdateService
             }
             else
             {
-                // Для других платформ открываем скачанный файл или папку
+                // Для других платформ (Linux/macOS) безопасно открываем папку со скачанным архивом
                 Process.Start(new ProcessStartInfo
                 {
-                    FileName = targetPath,
+                    FileName = tempFolder,
                     UseShellExecute = true
                 });
             }

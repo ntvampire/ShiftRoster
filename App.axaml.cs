@@ -19,8 +19,10 @@ public partial class App : Application
         {
             try
             {
-                string logFile = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "crash.log");
-                File.AppendAllText(logFile, $"[{DateTime.Now}] Unhandled: {e.ExceptionObject}\n");
+                string logDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ShiftRoster");
+                Directory.CreateDirectory(logDir);
+                string logFile = Path.Combine(logDir, "crash.log");
+                File.AppendAllText(logFile, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Unhandled: {e.ExceptionObject}\n");
             }
             catch { }
         };

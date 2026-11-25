@@ -390,7 +390,7 @@ public partial class MainWindow : Window
                                 }
                             });
                         });
-                        await UpdateService.Instance.DownloadAndLaunchInstallerAsync(update.DownloadUrl, prog, cts.Token);
+                        await UpdateService.Instance.DownloadAndLaunchInstallerAsync(update.DownloadUrl, prog, update.Sha256Checksum, cts.Token);
                     }
                     catch (OperationCanceledException)
                     {

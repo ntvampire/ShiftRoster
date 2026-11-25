@@ -176,7 +176,7 @@ public class ExcelExportService
             ws.Cell(currentRow, 1).Value = empIndex;
             ws.Cell(currentRow, 1).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
 
-            ws.Cell(currentRow, 2).Value = summary.EmployeeName;
+            ws.Cell(currentRow, 2).Value = SanitizeForExcel(summary.EmployeeName);
             ws.Cell(currentRow, 2).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Left;
             ws.Cell(currentRow, 2).Style.Alignment.Indent = 1;
 
@@ -378,7 +378,7 @@ public class ExcelExportService
                 ws.Cell(currentRow, 1).Value = empIndex;
                 ws.Cell(currentRow, 1).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
 
-                ws.Cell(currentRow, 2).Value = summary.EmployeeName;
+                ws.Cell(currentRow, 2).Value = SanitizeForExcel(summary.EmployeeName);
                 ws.Cell(currentRow, 2).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Left;
                 ws.Cell(currentRow, 2).Style.Alignment.Indent = 1;
 
@@ -630,7 +630,7 @@ public class ExcelExportService
             ws.Cell(currentRow, 1).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
 
             // 2. ФИО и должность в скобках С ОБЯЗАТЕЛЬНЫМ ПРОБЕЛОМ: «Иванов И.И. (Оператор)»
-            ws.Cell(currentRow, 2).Value = $"{empName} ({position})";
+            ws.Cell(currentRow, 2).Value = SanitizeForExcel($"{empName} ({position})");
             ws.Range(currentRow, 2, currentRow + 1, 2).Merge();
             ws.Cell(currentRow, 2).Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
             ws.Cell(currentRow, 2).Style.Alignment.WrapText = true;
@@ -949,7 +949,7 @@ public class ExcelExportService
             ws.Cell(currentRow, 1).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
 
             // ФИО и должность в скобках С ОБЯЗАТЕЛЬНЫМ ПРОБЕЛОМ: «Иванов И.И. (Оператор)»
-            ws.Cell(currentRow, 2).Value = $"{empName} ({position})";
+            ws.Cell(currentRow, 2).Value = SanitizeForExcel($"{empName} ({position})");
             ws.Range(currentRow, 2, currentRow + 3, 2).Merge();
             ws.Cell(currentRow, 2).Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
             ws.Cell(currentRow, 2).Style.Alignment.WrapText = true;
@@ -1138,6 +1138,24 @@ public class ExcelExportService
             counter++;
         }
         return unique;
+    }
+
+    /// <summary>
+    /// Санитизация текстовых значений перед записью в ячейку Excel для предотвращения Formula/CSV Injection.
+    /// Если текст начинается с '=', '+', '-', '@', значение экранируется ведущим апострофом.
+    /// </summary>
+    public static string SanitizeForExcel(string? text)
+    {
+        if (string.IsNullOrEmpty(text))
+            return string.Empty;
+
+        string trimmed = text;
+        if (trimmed.StartsWith('=') || trimmed.StartsWith('+') || trimmed.StartsWith('-') || trimmed.StartsWith('@'))
+        {
+            return "'" + trimmed;
+        }
+
+        return trimmed;
     }
 
     /// <summary>
