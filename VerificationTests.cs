@@ -1131,7 +1131,7 @@ public static class VerificationTests
         }
 
         // Проверка безопасности: валидация доверенных доменов загрузки обновлений
-        if (!UpdateService.IsTrustedDownloadUrl("https://github.com/ntvampire/ShiftRoster/releases/download/v1.0.9/ShiftRoster-Setup.exe") ||
+        if (!UpdateService.IsTrustedDownloadUrl("https://github.com/ntvampire/ShiftRoster/releases/download/v1.0.10/ShiftRoster-Setup.exe") ||
             !UpdateService.IsTrustedDownloadUrl("https://objects.githubusercontent.com/test-asset") ||
             !UpdateService.IsTrustedDownloadUrl("https://ntvampire.github.io/ShiftRoster/version.json"))
         {
